@@ -1336,33 +1336,31 @@ def Text_from_greyscale(input_image_filename, COL):
     return Fail, df
 
 
-def Scan_type_test(input_image_filename, COL):
-    PIX = COL.load()
-    img = cv2.imread(input_image_filename)
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-    lower_yellow = np.array([1, 100, 100], dtype=np.uint8)
-    upper_yellow = np.array([200, 255, 255], dtype=np.uint8)
-    mask = cv2.inRange(hsv, lower_yellow, upper_yellow)
+def Scan_type_test(input_image_filename):
+    """
+    Function for yellow filtering an image and searching for a list of target words indicative of a doppler ultrasound scan
+
+    Args:
+        input_image_filename (str) : Name of file within current directory, or path to a file.
+
+    Returns:
+        Fail (int) : Idicates if the file is a fail (1) - doesn't meet criteria for a doppler ultrasound, or pass (0) - does meet criteria. 
+
+    """
+
+    img = cv2.imread(input_image_filename)  # Input image file
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)  # Convert to grayscale
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)  # Convert to HSV
+    lower_yellow = np.array([1, 100, 100], dtype=np.uint8)  # Lower yellow bound
+    upper_yellow = np.array([200, 255, 255], dtype=np.uint8)  # Upper yellow bound
+    mask = cv2.inRange(hsv, lower_yellow, upper_yellow)  # Threshold HSV between bounds
     yellow_text = cv2.bitwise_and(gray, gray, mask=mask)
 
-    for y in range(
-        int(COL.size[1] * 0.45), COL.size[1]
-    ):  # Exclude bottom 3rd of image - these are fails
-        for x in range(COL.size[0]):
-            yellow_text[y, x] = 0
-
+    yellow_text[int(img.shape[1] * 0.45): img.shape[1], :] = 0  # Exclude bottom 3rd of image - target scans have no text of interest here.
     pixels = np.array(yellow_text)
     data = pytesseract.image_to_data(
         pixels, output_type=Output.DICT, lang="eng", config="--psm 3 "
     )
-    # -c tessedit_char_whitelist=./-0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghjklmnopqrstuvwxyz
-    # print(len(data['text']))
-    # if len(data['text'])<30:
-    #     Fail = 1 # logical, keep scan or not
-    #     #print("not enough text found - wrong scan type")
-    # else:
-    #     Fail = 0
 
     # Loop through each word and draw a box around it
     for i in range(len(data["text"])):
@@ -1377,7 +1375,6 @@ def Scan_type_test(input_image_filename, COL):
     # cv2.imshow('img', img)
 
     # Perform OCR on the preprocessed image
-    lang = "eng"
     custom_config = r"--oem 3 --psm 3"
     text = pytesseract.image_to_string(pixels, lang="eng", config=custom_config)
 
@@ -1410,9 +1407,7 @@ def Scan_type_test(input_image_filename, COL):
         "Umb-MD",
         "Umb-TAmax",
         "Umb-HR",
-    ]
-    target_line = None
-    results = []
+    ]  # Target words to search for - there may be more to add to this.
 
     # Split text into lines
     lines = text.split("\n")
@@ -1420,28 +1415,14 @@ def Scan_type_test(input_image_filename, COL):
     # Initialize DataFrame
     df = pd.DataFrame(columns=["Line", "Word", "Value", "Unit"])
 
-    Fail = 1
+    Fail = 1  # initialise fail variable
     for target in target_words:
         for word in lines:
             if target in word:
                 print(f"{target} found in {word}")
-                Fail = 0
+                Fail = 0 # If any of the words are found, then no fail.
         # Print DataFrame
-    print(input_image_filename)
-    # print(df)
+    print(input_image_filename) # Print the file name just processed
 
-    # # Locate the line in the image
-    # if target_line is not None:
-    #     font = cv2.FONT_HERSHEY_SIMPLEX
-    #     font_scale = 1
-    #     thickness = 2
-    #     color = (0, 0, 255)
-    #     y0 = int(img.shape[0] * line_num / len(lines))
-    #     y1 = int(img.shape[0] * (line_num+1) / len(lines))
-    #     cv2.rectangle(img, (0, y0), (img.shape[1], y1), color, thickness)
-    #     cv2.putText(img, f'Line {line_num}: {target_line}', (0, y0+30), font, font_scale, color, thickness)
+    return Fail, df  # Return the fail variable and dataframe contraining extracted text.
 
-    # # Display the result
-    # cv2.imshow('Result', img)
-
-    return Fail, df
