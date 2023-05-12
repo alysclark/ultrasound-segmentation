@@ -1,44 +1,36 @@
 import matplotlib.pyplot as plt
-import numpy as np
 import pytesseract
-import re
 from PIL import Image
-from pytesseract import Output
-import cv2
 import traceback
-pytesseract.pytesseract.tesseract_cmd = "C:/Program Files/Tesseract-OCR/tesseract.exe"
 import os
 import pickle
-from skimage.measure import label, regionprops
-from PIL import Image
-import matplotlib.pyplot as plt
-
-import openpyxl
-from os import walk
 
 # Import sementation module
 import General_functions
 
+pytesseract.pytesseract.tesseract_cmd = "C:/Program Files/Tesseract-OCR/tesseract.exe"
 
-# filenames = next(walk('Scans/'), (None, None, []))[2]  # [] if no file
-# text_file = open("sample3_file_list_test.txt", "r")
-# filenames = text_file.read().replace('\'','').replace('[','').replace(']','').replace(' ','').split(',')
-with open("patient_paths.pkl", "rb") as f:
+# Open the file containing file names of target scans - created by running Organise_files.py
+with open("patient_paths_test.pkl", "rb") as f:
     text_file = pickle.load(f)
 
+# Define which patients to process (between key1 and key2)
 key1 = "0000"
 key2 = "0039"
 # Get a list of all the keys in the dictionary
 keys = list(text_file.keys())
 
-# Get the index of the first key
-idx1 = keys.index(key1)
+try:
+    # Get the index of the first key
+    idx1 = keys.index(key1)
 
-# Get the index of the second key
-idx2 = keys.index(key2)
+    # Get the index of the second key
+    idx2 = keys.index(key2)
 
-# Get the sublist of keys between the two keys
-subkeys = keys[idx1 : idx2 + 1]
+    # Get the sublist of keys between the two keys
+    subkeys = keys[idx1:idx2 + 1]
+except Exception:  # If the specified keys dont exist, default to all keys.
+    subkeys = keys
 
 filenames = []
 # Iterate through the sublist of keys
@@ -47,19 +39,18 @@ for key in subkeys:
     filenames = filenames + text_file[key]
     # print(filenames)
 
-
-OUT_path = "E:/us-data-processed/"
-xcel_file = OUT_path + "sample3_processed_data"
+output_path = "E:/us-data-processed/"
+# Inititalise some variables 
 Text_data = []  # text data extracted from image
-Annotated_scans = []
+Annotated_scans = [] 
 Digitized_scans = []
 
 for input_image_filename in filenames:  # Iterare through all file names and populate excel file
-    # input_image_filename = "E:/us-data-anon/0000/IHE_PDI/00003511/AA3A43F2/AAD8766D/0000371E\\EEEAE224.JPG"
+    # input_image_filename = "To/test/one/file.jpg"
     image_name = os.path.basename(input_image_filename)
     print(input_image_filename)
 
-    try:  # Try initial segmentation
+    try:  # Try text extraction
         colRGBA = Image.open(input_image_filename)  # These images are in RGBA form
         col = colRGBA.convert("RGB")  # We need RGB, so convert here.
         pix = (
@@ -71,8 +62,8 @@ for input_image_filename in filenames:  # Iterare through all file names and pop
         print("Done Colour extract")
 
         Fail, df = General_functions.Text_from_greyscale(input_image_filename, COL)
-    except:  # flat fail on 1
-        print("Failed Initial segmentation")
+    except Exception:  # If text extraction fails
+        print("Failed Text extraction")
         Text_data.append(None)
         Fail = 0
         pass
@@ -81,24 +72,18 @@ for input_image_filename in filenames:  # Iterare through all file names and pop
         segmentation_mask, Xmin, Xmax, Ymin, Ymax = General_functions.Initial_segmentation(
             input_image_filename=input_image_filename
         )
-    except:  # flat fail on 1
+    except Exception:  # If initial segmentation fails
         print("Failed Initial segmentation")
         Fail = Fail + 1
         pass
 
-    try:  # define end ROIs
+    try:  # Define end ROIs
         Left_dimensions, Right_dimensions = General_functions.Define_end_ROIs(
             segmentation_mask, Xmin, Xmax, Ymin, Ymax
         )
-    except:
-        print("Failed Defining ROI")
-        Fail = Fail + 1
-        pass
-
-    try:
         Waveform_dimensions = [Xmin, Xmax, Ymin, Ymax]
-    except:
-        print("Failed Waveform dimensions")
+    except Exception:  # If defing ROI fails
+        print("Failed Defining ROI")
         Fail = Fail + 1
         pass
 
@@ -106,7 +91,7 @@ for input_image_filename in filenames:  # Iterare through all file names and pop
         refined_segmentation_mask, top_curve_mask = General_functions.Segment_refinement(
             input_image_filename, Xmin, Xmax, Ymin, Ymax
         )
-    except:
+    except Exception:
         print("Failed Segment refinement")
         Fail = Fail + 1
         pass
@@ -126,7 +111,7 @@ for input_image_filename in filenames:  # Iterare through all file names and pop
             ROI2,
             ROI3,
         ) = General_functions.Search_for_ticks(
-            input_image_filename,"Left", Left_dimensions, Right_dimensions
+            input_image_filename, "Left", Left_dimensions, Right_dimensions
         )
         ROIAX, Lnumber, Lpositions, ROIL = General_functions.Search_for_labels(
             Cs,
@@ -157,7 +142,7 @@ for input_image_filename in filenames:  # Iterare through all file names and pop
             ROI2,
             ROI3,
         ) = General_functions.Search_for_ticks(
-            input_image_filename,"Right", Left_dimensions, Right_dimensions
+            input_image_filename, "Right", Left_dimensions, Right_dimensions
         )
         ROIAX, Rnumber, Rpositions, ROIR = General_functions.Search_for_labels(
             Cs,
@@ -182,7 +167,9 @@ for input_image_filename in filenames:  # Iterare through all file names and pop
             Left_axis=ROIL,
             Right_axis=ROIR,
         )
-        Annotated_path = OUT_path + image_name + "_Annotated.png"
+        Annotated_path = output_path + image_name + "_Annotated.png"
+
+        #  Create annotated figure for analysis
         fig1, ax1 = plt.subplots(1)
         ax1.imshow(col)
         ax1.set_xticks([])
@@ -190,7 +177,7 @@ for input_image_filename in filenames:  # Iterare through all file names and pop
         ax1.tick_params(axis="both", which="both", length=0)
         fig1.savefig(Annotated_path, dpi=900, bbox_inches="tight", pad_inches=0)
         Annotated_scans.append(Annotated_path)
-    except:
+    except Exception:
         traceback.print_exc()  # prints the error message and traceback
         print("Failed Axes search")
         Annotated_scans.append(None)
@@ -204,18 +191,20 @@ for input_image_filename in filenames:  # Iterare through all file names and pop
         try:
             df = General_functions.Plot_correction(Xplot, Yplot, df)
             Text_data.append(df)
-        except:
+        except Exception:
             print("Failed correction")
             continue
-        Digitized_path = OUT_path + image_name + "_Digitized.png"
+        Digitized_path = output_path + image_name + "_Digitized.png"
+
+        # Open figure initialised in Plot_correction function
         plt.figure(2)
         plt.savefig(Digitized_path, dpi=900, bbox_inches="tight", pad_inches=0)
         Digitized_scans.append(Digitized_path)
-    except:
+    except Exception:
         print("Failed Digitization")
         try:
             Text_data.append(df)
-        except:
+        except Exception:
             Text_data.append(None)
         Digitized_scans.append(None)
         Fail = Fail + 1
@@ -239,7 +228,7 @@ for input_image_filename in filenames:  # Iterare through all file names and pop
     for i in to_del:
         try:
             exec("del %s" % i)
-        except:
+        except Exception:
             pass
 
     plt.close("all")
@@ -248,6 +237,8 @@ for input_image_filename in filenames:  # Iterare through all file names and pop
 print(Digitized_scans)
 print(Annotated_scans)
 print(Text_data)
+
+# Save the processed data 
 with open("lists3.pickle", "wb") as f:
     pickle.dump([filenames, Digitized_scans, Annotated_scans, Text_data], f)
 i = 0

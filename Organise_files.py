@@ -7,7 +7,7 @@ import General_functions
 This script searches a given directory and identifies the images that are likely to be doppler ultrasounds.
 """
 # root diretory to search
-root_dir = "E:/us-data-anon/0000"
+root_dir = "E:/us-data-anon"#/0000"
 
 # Initialize a dictionary to store the paths for each patient
 patient_paths = {}
