@@ -56,7 +56,9 @@ Function that searches for labels withing the axes ROI.
 
 ## Plot_Digitized_data
 
-Digitized the ticks and labels to plot waveform.
+A function for digitizing the extracted ticks and labels data to plot a waveform, using the output from *segment refinement*. This requries the 
+
+![alt text](Digitize_Function_diagram.png)
 
 ## Plot_correction
 
