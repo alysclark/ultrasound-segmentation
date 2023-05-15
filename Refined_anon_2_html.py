@@ -10,39 +10,41 @@ import General_functions
 
 pytesseract.pytesseract.tesseract_cmd = "C:/Program Files/Tesseract-OCR/tesseract.exe"
 
-# Open the file containing file names of target scans - created by running Organise_files.py
-with open("patient_paths_test.pkl", "rb") as f:
-    text_file = pickle.load(f)
+# If you have ran the Organise_files.py script, load the output here:
+# # Open the file containing file names of target scans - created by running Organise_files.py
+# with open("patient_paths_test.pkl", "rb") as f:
+#     text_file = pickle.load(f)
 
-# Define which patients to process (between key1 and key2)
-key1 = "0000"
-key2 = "0039"
-# Get a list of all the keys in the dictionary
-keys = list(text_file.keys())
+# # Define which patients to process (between key1 and key2)
+# key1 = "0000"
+# #key2 = "0039"
+# # Get a list of all the keys in the dictionary
+# keys = list(text_file.keys())
 
-try:
-    # Get the index of the first key
-    idx1 = keys.index(key1)
+# try:
+#     # Get the index of the first key
+#     idx1 = keys.index(key1)
+#     # Get the index of the second key
+#     idx2 = keys.index(key2)
+#     # Get the sublist of keys between the two keys
+#     subkeys = keys[idx1:idx2 + 1]
+# except Exception:  # If the specified keys dont exist, default to all keys.
+#     subkeys = keys
 
-    # Get the index of the second key
-    idx2 = keys.index(key2)
+# filenames = []
+# # Iterate through the sublist of keys
+# for key in subkeys:
+#     # Access the value corresponding to the key
+#     filenames = filenames + text_file[key]
+#     # print(filenames)
 
-    # Get the sublist of keys between the two keys
-    subkeys = keys[idx1:idx2 + 1]
-except Exception:  # If the specified keys dont exist, default to all keys.
-    subkeys = keys
+# If you want to run a single file:
+filenames = ['C:/Users/dalek/OneDrive/Ultasound_segmentation/Lt_test_image.png'] #"Path/To/Image.jpeg"
 
-filenames = []
-# Iterate through the sublist of keys
-for key in subkeys:
-    # Access the value corresponding to the key
-    filenames = filenames + text_file[key]
-    # print(filenames)
-
-output_path = "E:/us-data-processed/"
-# Inititalise some variables 
+output_path = "E:/us-data-processed/"  # where you want to save data
+# Inititalise some variables
 Text_data = []  # text data extracted from image
-Annotated_scans = [] 
+Annotated_scans = []
 Digitized_scans = []
 
 for input_image_filename in filenames:  # Iterare through all file names and populate excel file
@@ -63,6 +65,7 @@ for input_image_filename in filenames:  # Iterare through all file names and pop
 
         Fail, df = General_functions.Text_from_greyscale(input_image_filename, COL)
     except Exception:  # If text extraction fails
+        traceback.print_exc()  # prints the error message and traceback
         print("Failed Text extraction")
         Text_data.append(None)
         Fail = 0
@@ -92,6 +95,7 @@ for input_image_filename in filenames:  # Iterare through all file names and pop
             input_image_filename, Xmin, Xmax, Ymin, Ymax
         )
     except Exception:
+        traceback.print_exc()  # prints the error message and traceback
         print("Failed Segment refinement")
         Fail = Fail + 1
         pass
@@ -167,7 +171,7 @@ for input_image_filename in filenames:  # Iterare through all file names and pop
             Left_axis=ROIL,
             Right_axis=ROIR,
         )
-        Annotated_path = output_path + image_name + "_Annotated.png"
+        Annotated_path = output_path + image_name.partition(".")[0] + "_Annotated.png"
 
         #  Create annotated figure for analysis
         fig1, ax1 = plt.subplots(1)
@@ -194,7 +198,7 @@ for input_image_filename in filenames:  # Iterare through all file names and pop
         except Exception:
             print("Failed correction")
             continue
-        Digitized_path = output_path + image_name + "_Digitized.png"
+        Digitized_path = output_path + image_name.partition(".")[0] + "_Digitized.png"
 
         # Open figure initialised in Plot_correction function
         plt.figure(2)
@@ -239,6 +243,6 @@ print(Annotated_scans)
 print(Text_data)
 
 # Save the processed data 
-with open("lists3.pickle", "wb") as f:
+with open("solo_test.pickle", "wb") as f:
     pickle.dump([filenames, Digitized_scans, Annotated_scans, Text_data], f)
 i = 0

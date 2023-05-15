@@ -6,7 +6,7 @@ import pandas as pd
 import pickle
 
 # Loading lists from the saved file
-with open('lists3.pickle', 'rb') as f:
+with open('solo_test.pickle', 'rb') as f:
     scan_paths,Digitized_scans, Annotated_scans,Text_data = pickle.load(f)
 
 
