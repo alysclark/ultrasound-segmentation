@@ -7,7 +7,7 @@ import General_functions
 This script searches a given directory and identifies the images that are likely to be doppler ultrasounds.
 """
 # root diretory to search
-root_dir = "E:/us-data-anon/0000"
+root_dir = "/mnt/veracrypt2/us-data-anon/0000"
 
 # Initialize a dictionary to store the paths for each patient
 patient_paths = {}
@@ -60,5 +60,5 @@ for patient_dir in os.listdir(root_dir):  # If the root_dir is to a folder conta
             patient_paths[patient_id] = patient_path_list
 
 # save the patient_paths dictionary to a file in current directory
-with open('patient_paths_test.pkl', 'wb') as f:
+with open('patient_paths.pkl', 'wb') as f:
     pickle.dump(patient_paths, f)

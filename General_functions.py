@@ -26,9 +26,6 @@ import re
 import pytesseract
 from pytesseract import Output
 
-pytesseract.pytesseract.tesseract_cmd = "C:/Program Files/Tesseract-OCR/tesseract.exe"
-
-
 def Initial_segmentation(input_image_filename):
     """Perform an initial corse segmentation of the waveform.
 
@@ -1228,10 +1225,6 @@ def Text_from_greyscale(input_image_filename, COL):
         populated with data extracted from the image with tesseract.
 
     """
-
-    pytesseract.pytesseract.tesseract_cmd = (
-        "C:/Program Files/Tesseract-OCR/tesseract.exe"
-    )
 
     PIX = COL.load()
     img = cv2.imread(input_image_filename)

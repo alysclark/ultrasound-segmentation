@@ -6,7 +6,7 @@ from PIL import Image
 from pytesseract import Output
 import cv2
 import traceback
-pytesseract.pytesseract.tesseract_cmd = "C:/Program Files/Tesseract-OCR/tesseract.exe"
+#pytesseract.pytesseract.tesseract_cmd = "C:/Program Files/Tesseract-OCR/tesseract.exe"
 import os
 import pickle
 from skimage.measure import label, regionprops
@@ -26,19 +26,8 @@ import General_functions
 with open("patient_paths.pkl", "rb") as f:
     text_file = pickle.load(f)
 
-key1 = "0000"
-key2 = "0039"
 # Get a list of all the keys in the dictionary
-keys = list(text_file.keys())
-
-# Get the index of the first key
-idx1 = keys.index(key1)
-
-# Get the index of the second key
-idx2 = keys.index(key2)
-
-# Get the sublist of keys between the two keys
-subkeys = keys[idx1 : idx2 + 1]
+subkeys = list(text_file.keys())
 
 filenames = []
 # Iterate through the sublist of keys
@@ -48,7 +37,8 @@ for key in subkeys:
     # print(filenames)
 
 
-OUT_path = "E:/us-data-processed/"
+OUT_path = "/mnt/veracrypt2/us-data-processed/"
+os.makedirs(OUT_path, exist_ok=True)
 xcel_file = OUT_path + "sample3_processed_data"
 Text_data = []  # text data extracted from image
 Annotated_scans = []
