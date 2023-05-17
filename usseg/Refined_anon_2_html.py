@@ -107,7 +107,7 @@ def segment(filesname=None, output_dir=None, pickle_path=None):
     else:
         logging.warning(
             f"Unrecognised filenames type {type(filenames)}"
-            "Excepted either a string or a list".
+            "Excepted either a string or a list"
         )
 
 
