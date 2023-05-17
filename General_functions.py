@@ -1075,7 +1075,7 @@ def Colour_extract(input_image_filename, TargetRGB, cyl_length, cyl_radius):
     # ax.zaxis.label.set_color('blue')
     # ax.tick_params(axis='z', colors='blue')
     # ax.view_init(20, -45)
-    # plt.show()
+    #plt.show()
 
     ## CYLINDER STUFF
     # defining mask
@@ -1193,12 +1193,13 @@ def Colour_extract(input_image_filename, TargetRGB, cyl_length, cyl_radius):
     Bmat = np.array(Bmat)
     Xs = np.array(Xs)
     Ys = np.array(Ys)
-    # ax.scatter(Rmat[ids],Gmat[ids],Bmat[ids],c = C[ids]/255) # plot the select points in RGB coords
-    # #ax.scatter(Rmat,Gmat,Bmat,c = C/255)
-    # plt.show()
+    #ax.scatter(Rmat[ids],Gmat[ids],Bmat[ids],c = C[ids]/255) # plot the select points in RGB coords
+    #ax.scatter(Rmat,Gmat,Bmat,c = C/255)
+    #plt.show()
 
     ## COMBINE
     COL = Image.open(input_image_filename)
+    COL = COL.convert("RGB")  # We need RGB, so convert here.
     PIX = COL.load()
 
     for id in ids[0]:
@@ -1257,24 +1258,59 @@ def Text_from_greyscale(input_image_filename, COL):
         Fail = 0
 
     # Loop through each word and draw a box around it
+    y_center = np.zeros(len(data["text"])) # Variable to store the y-center of each bounding box of text detected.
     for i in range(len(data["text"])):
-        x = data["left"][i]
-        y = data["top"][i]
-        segmentation_mask = data["width"][i]
-        h = data["height"][i]
-        if int(data["conf"][i]) > 1:
-            cv2.rectangle(img, (x, y), (x + segmentation_mask, y + h), (0, 0, 255), 2)
+        if data["text"][i] != '':
+            x = data["left"][i]
+            y = data["top"][i]
+            w = data["width"][i]
+            h = data["height"][i]
+            if int(data["conf"][i]) > 1:
+                cv2.rectangle(img, (x, y), (x + w, y + h), (0, 0, 255), 2)
+                y_center[i] = y + (h/2)
+            else:
+                y_center[i] = 0  
+        else:
+            y_center[i] = 0
+        
+    from sklearn.cluster import DBSCAN
+
+    def group_similar_numbers(array, tolerance, words):
+        # This function groups indexes of words with similar y-coordinate center
+        # Assuming that this is an indicator of words being part of the same line
+        # Prepare the data for clustering
+        data = np.array(array).reshape(-1, 1)
+
+        # Perform DBSCAN clustering
+        dbscan = DBSCAN(eps=tolerance, min_samples=2)
+        labels = dbscan.fit_predict(data)
+
+        # Group the indices based on the cluster labels
+        groups = {}
+        for i, label in enumerate(labels):
+            if label in groups:
+                groups[label].append(i)
+            else:
+                groups[label] = [i]
+
+        # Add the words together for each group to make each line of text
+        grouped_words = []
+        for group in groups.values():
+            group_words = [words[idx] for idx in group]
+            grouped_words.append(' '.join(group_words))
+
+        return grouped_words
+
+    tolerance = 3  # Adjust the tolerance value - the max difference between y-coords considered on the same line
+    grouped_words = group_similar_numbers(y_center, tolerance, data["text"])
+
+    for group in grouped_words:
+        print(group)
 
     # Display image
-    # cv2.imshow('img', img)
-
-    # Perform OCR on the preprocessed image
-    lang = "eng"
-    custom_config = r"--oem 3 --psm 3"
-    text = pytesseract.image_to_string(pixels, lang="eng", config=custom_config)
+    cv2.imshow('img', img)
 
     # Analyze the OCR output
-    lines = text.splitlines()
     target_words = [
         "Lt Ut-PS",
         "Lt Ut-ED",
@@ -1282,7 +1318,7 @@ def Text_from_greyscale(input_image_filename, COL):
         "Lt Ut-PI",
         "Lt Ut-RI",
         "Lt Ut-MD",
-        "Lt UT-TAmax",
+        "Lt Ut-TAmax",
         "Lt Ut-HR",
         "Rt Ut-PS",
         "Rt Ut-ED",
@@ -1290,7 +1326,7 @@ def Text_from_greyscale(input_image_filename, COL):
         "Rt Ut-PI",
         "Rt Ut-RI",
         "Rt Ut-MD",
-        "Rt UT-TAmax",
+        "Rt Ut-TAmax",
         "Rt Ut-HR",
         "Umb-PS",
         "Umb-ED",
@@ -1301,11 +1337,9 @@ def Text_from_greyscale(input_image_filename, COL):
         "Umb-TAmax",
         "Umb-HR",
     ]
-    target_line = None
-    results = []
 
     # Split text into lines
-    lines = text.split("\n")
+    lines = grouped_words #text.split("\n")
 
     # Initialize DataFrame
     df = pd.DataFrame(columns=["Line", "Word", "Value", "Unit"])
@@ -1325,6 +1359,13 @@ def Text_from_greyscale(input_image_filename, COL):
                         {"Line": i + 1, "Word": word, "Value": value, "Unit": unit},
                         ignore_index=True,
                     )
+                else:
+                    print("couldn't find numeric data for line")
+                    df = df.append(
+                        {"Line": i + 1, "Word": word, "Value": 0, "Unit": 0},
+                        ignore_index=True,
+                    )
+                    pass
 
     # Print DataFrame
     print(input_image_filename)
@@ -1334,7 +1375,6 @@ def Text_from_greyscale(input_image_filename, COL):
     # cv2.imshow('Result', img)
 
     return Fail, df
-
 
 def Scan_type_test(input_image_filename):
     """
