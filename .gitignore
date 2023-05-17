@@ -7,3 +7,4 @@ tmp/
 output.html
 test1.txt
 *__pycache__*
+dist/
