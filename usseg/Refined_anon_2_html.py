@@ -57,7 +57,7 @@ def setup_tesseract():
     return pytesseract.get_tesseract_version()
 
 
-def segment(filesname=None):
+def segment(filesname=None, output_dir=None):
     """Segments the pre-selected ultrasound images
 
     Args:
@@ -68,6 +68,10 @@ def segment(filesname=None):
             If a list, must be a list of filenames to ultrasound images to
             segment.
             If None, will load a test image.
+
+        output_dir (str, optional) : Path to the output directory to store annoated
+            images. If None, will load from config file.
+            Defaults to None.
     """
 
     # filenames = next(walk('Scans/'), (None, None, []))[2]  # [] if no file
@@ -102,9 +106,10 @@ def segment(filesname=None):
         )
 
 
-    output_path = "/mnt/veracrypt2/us-data-processed/"
-    os.makedirs(output_path, exist_ok=True)
-    xcel_file = output_path + "sample3_processed_data"
+    if output_dir is None:
+        output_dir = toml.load("config.toml")["output_dir"]
+    os.makedirs(output_dir, exist_ok=True)
+    xcel_file = output_dir + "sample3_processed_data"
     Text_data = []  # text data extracted from image
     Annotated_scans = []
     Digitized_scans = []
@@ -239,7 +244,7 @@ def segment(filesname=None):
                 Left_axis=ROIL,
                 Right_axis=ROIR,
             )
-            Annotated_path = output_path + image_name.partition(".")[0] + "_Annotated.png"
+            Annotated_path = output_dir + image_name.partition(".")[0] + "_Annotated.png"
             fig1, ax1 = plt.subplots(1)
             ax1.imshow(col)
             ax1.set_xticks([])
@@ -265,7 +270,7 @@ def segment(filesname=None):
                 traceback.print_exc()
                 print("Failed correction")
                 continue
-            Digitized_path = output_path + image_name.partition(".")[0] + "_Digitized.png"
+            Digitized_path = output_dir + image_name.partition(".")[0] + "_Digitized.png"
             plt.figure(2)
             plt.savefig(Digitized_path, dpi=900, bbox_inches="tight", pad_inches=0)
             Digitized_scans.append(Digitized_path)
