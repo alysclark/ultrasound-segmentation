@@ -57,7 +57,7 @@ def setup_tesseract():
     return pytesseract.get_tesseract_version()
 
 
-def segment(filesname=None, output_dir=None, pickle_path=None):
+def segment(filename=None, output_dir=None, pickle_path=None):
     """Segments the pre-selected ultrasound images
 
     Args:
