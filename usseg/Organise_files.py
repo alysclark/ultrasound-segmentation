@@ -8,6 +8,9 @@ import re
 import pickle
 import traceback
 
+# Module imports
+import toml
+
 # Local imports
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 sys.path.append(BASE_DIR)
@@ -82,5 +85,5 @@ def get_likely_us(root_dir):
 
 if __name__ == "__main__":
 
-    root_dir = "/mnt/veracrypt2/us-data-anon/0000"
+    root_dir = toml.load("config.toml")["root_dir"]
     get_likely_us(root_dir)

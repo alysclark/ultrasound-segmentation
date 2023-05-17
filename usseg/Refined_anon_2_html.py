@@ -57,28 +57,54 @@ def setup_tesseract():
     return pytesseract.get_tesseract_version()
 
 
-def segment():
+def segment(filesname=None):
+    """Segments the pre-selected ultrasound images
+
+    Args:
+        filenames (str or list, optional) : If string, must be either a single
+            file name path or a path to a pickle object containing the list of
+            files. Pickle objects are expected to have the extension ".pkl"
+            or ".pickle".
+            If a list, must be a list of filenames to ultrasound images to
+            segment.
+            If None, will load a test image.
+    """
 
     # filenames = next(walk('Scans/'), (None, None, []))[2]  # [] if no file
     # text_file = open("sample3_file_list_test.txt", "r")
     # filenames = text_file.read().replace('\'','').replace('[','').replace(']','').replace(' ','').split(',')
-    with open("patient_paths.pkl", "rb") as f:
-        text_file = pickle.load(f)
+    if filenames is None:
+        filenames = ["Lt_test_image.png"]
 
-    # Get a list of all the keys in the dictionary
-    subkeys = list(text_file.keys())
+    elif isinstance(filenames, list):
+        pass
 
-    filenames = []
-    # Iterate through the sublist of keys
-    for key in subkeys:
-        # Access the value corresponding to the key
-        filenames = filenames + text_file[key]
-        # print(filenames)
+    elif filenames.endswith(".pkl") or filenames.endswith(".pickle"):
+        with open(filenames, "rb") as f:
+            text_file = pickle.load(f)
+
+        # Get a list of all the keys in the dictionary
+        subkeys = list(text_file.keys())
+
+        filenames = []
+        # Iterate through the sublist of keys
+        for key in subkeys:
+            # Access the value corresponding to the key
+            filenames = filenames + text_file[key]
+            # print(filenames)
+            #
+    elif isinstance(filenames, str):
+        filenames = [filenames]
+    else:
+        logging.warning(
+            f"Unrecognised filenames type {type(filenames)}"
+            "Excepted either a string or a list".
+        )
 
 
-    OUT_path = "/mnt/veracrypt2/us-data-processed/"
-    os.makedirs(OUT_path, exist_ok=True)
-    xcel_file = OUT_path + "sample3_processed_data"
+    output_path = "/mnt/veracrypt2/us-data-processed/"
+    os.makedirs(output_path, exist_ok=True)
+    xcel_file = output_path + "sample3_processed_data"
     Text_data = []  # text data extracted from image
     Annotated_scans = []
     Digitized_scans = []
@@ -100,8 +126,9 @@ def segment():
             print("Done Colour extract")
 
             Fail, df = General_functions.Text_from_greyscale(input_image_filename, COL)
-        except:  # flat fail on 1
-            print("Failed Initial segmentation")
+        except Exception:  # flat fail on 1
+            traceback.print_exc()  # prints the error message and traceback
+            print("Failed Text extraction")
             Text_data.append(None)
             Fail = 0
             pass
@@ -136,6 +163,7 @@ def segment():
                 input_image_filename, Xmin, Xmax, Ymin, Ymax
             )
         except:
+            traceback.print_exc()  # prints the error message and traceback
             print("Failed Segment refinement")
             Fail = Fail + 1
             pass
@@ -211,7 +239,7 @@ def segment():
                 Left_axis=ROIL,
                 Right_axis=ROIR,
             )
-            Annotated_path = OUT_path + image_name + "_Annotated.png"
+            Annotated_path = output_path + image_name.partition(".")[0] + "_Annotated.png"
             fig1, ax1 = plt.subplots(1)
             ax1.imshow(col)
             ax1.set_xticks([])
@@ -219,7 +247,7 @@ def segment():
             ax1.tick_params(axis="both", which="both", length=0)
             fig1.savefig(Annotated_path, dpi=900, bbox_inches="tight", pad_inches=0)
             Annotated_scans.append(Annotated_path)
-        except:
+        except Exception:
             traceback.print_exc()  # prints the error message and traceback
             print("Failed Axes search")
             Annotated_scans.append(None)
@@ -233,18 +261,21 @@ def segment():
             try:
                 df = General_functions.Plot_correction(Xplot, Yplot, df)
                 Text_data.append(df)
-            except:
+            except Exception:
+                traceback.print_exc()
                 print("Failed correction")
                 continue
-            Digitized_path = OUT_path + image_name + "_Digitized.png"
+            Digitized_path = output_path + image_name.partition(".")[0] + "_Digitized.png"
             plt.figure(2)
             plt.savefig(Digitized_path, dpi=900, bbox_inches="tight", pad_inches=0)
             Digitized_scans.append(Digitized_path)
-        except:
+        except Exception:
             print("Failed Digitization")
+            traceback.print_exc()
             try:
                 Text_data.append(df)
-            except:
+            except Exception:
+                traceback.print_exc()
                 Text_data.append(None)
             Digitized_scans.append(None)
             Fail = Fail + 1
@@ -268,7 +299,7 @@ def segment():
         for i in to_del:
             try:
                 exec("del %s" % i)
-            except:
+            except Exception:
                 pass
 
         plt.close("all")

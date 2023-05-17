@@ -1,0 +1,3 @@
+# Copy this file to `config.toml` and edit to match your local configuration.
+root_dir = "E:/us-data-anon" # Root directory to the stored data.
+output_path = "E:/us-data-processed/"  # Where to save the processed data.
