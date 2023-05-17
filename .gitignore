@@ -1,0 +1,9 @@
+.DS_Store
+.idea
+*.log
+tmp/
+*.pkl
+*.pickle
+output.html
+test1.txt
+*__pycache__*
