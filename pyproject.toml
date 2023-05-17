@@ -21,6 +21,7 @@ openpyxl = "^3.1.2"
 plotly = "^5.14.1"
 pytest = "^7.3.1"
 toml = "^0.10.2"
+sklearn = "^0.0.post5"
 
 
 [build-system]

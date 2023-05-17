@@ -894,6 +894,17 @@ files = [
 ]
 
 [[package]]
+name = "sklearn"
+version = "0.0.post5"
+description = "deprecated sklearn package, use scikit-learn instead"
+category = "main"
+optional = false
+python-versions = "*"
+files = [
+    {file = "sklearn-0.0.post5.tar.gz", hash = "sha256:7377c714a03a79bbe9196f435db931fd2a6fa8c68514da7ed3a251fd08c52e2c"},
+]
+
+[[package]]
 name = "tenacity"
 version = "8.2.2"
 description = "Retry code until it succeeds"
@@ -965,4 +976,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.12"
-content-hash = "6ea6e9c3c0cd726f3133826110e116dad68d7a9887c0f8b1894822327ff14af3"
+content-hash = "4a61371fc099ea425300f4c998ce36c8c196ab832cc2d9082a5e51a2e851b891"
