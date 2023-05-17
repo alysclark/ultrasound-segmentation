@@ -20,6 +20,7 @@ import cv2
 import traceback
 from skimage.measure import label, regionprops
 import openpyxl
+import toml
 
 # Import sementation module
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
