@@ -57,7 +57,7 @@ def setup_tesseract():
     return pytesseract.get_tesseract_version()
 
 
-def segment(filesname=None, output_dir=None):
+def segment(filesname=None, output_dir=None, pickle_path=None):
     """Segments the pre-selected ultrasound images
 
     Args:
@@ -71,6 +71,11 @@ def segment(filesname=None, output_dir=None):
 
         output_dir (str, optional) : Path to the output directory to store annoated
             images. If None, will load from config file.
+            Defaults to None.
+        pickle_path (str or bool) : If pickle_path is False, will not store the
+            list of likely us images as a pickle file. If None,
+            will load the pickle path from "config.toml".
+            Else if a string, will dump the pickled list to the specified path.
             Defaults to None.
     """
 
@@ -313,9 +318,13 @@ def segment(filesname=None, output_dir=None):
     print(Digitized_scans)
     print(Annotated_scans)
     print(Text_data)
-    with open("lists3.pickle", "wb") as f:
-        pickle.dump([filenames, Digitized_scans, Annotated_scans, Text_data], f)
+    if pickle_path is not False:
+        if pickle_path is None:
+            pickle_path = toml.load("config.toml")["pickle"]["segmented_data"]
+        with open(pickle_path, "wb") as f:
+            pickle.dump([filenames, Digitized_scans, Annotated_scans, Text_data], f)
     i = 0
+    return (filenames, Digitized_scans, Annotated_scans, Text_data)
 
 if __name__ == "__main__":
     segment()

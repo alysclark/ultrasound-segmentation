@@ -16,11 +16,16 @@ BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 sys.path.append(BASE_DIR)
 from usseg import General_functions
 
-def get_likely_us(root_dir):
+def get_likely_us(root_dir, pickle_path=None):
     """Searches a directory and identifies the images that are likely to be doppler ultrasounds.
 
     Args:
         root_dir (str) : Path to the root directory .
+        pickle_path (str or bool) : If pickle_path is False, will not store the
+            list of likely us images as a pickle file. If None,
+            will load the pickle path from "config.toml".
+            Else if a string, will dump the pickled list to the specified path.
+            Defaults to None.
 
     Returns:
         return_val (bool) : True if sucessful, False otherwise.
@@ -78,10 +83,14 @@ def get_likely_us(root_dir):
                 patient_paths[patient_id] = patient_path_list
 
     # save the patient_paths dictionary to a file in current directory
-    with open('patient_paths.pkl', 'wb') as f:
-        pickle.dump(patient_paths, f)
+    if pickle_path is not False:
+        if pickle_path is None:
+            pickle_path = toml.load("config.toml")["pickle"]["likely_us_images"]
 
-    return True
+        with open(pickle_path, 'wb') as f:
+            pickle.dump(patient_paths, f)
+
+    return patient_paths
 
 if __name__ == "__main__":
 
