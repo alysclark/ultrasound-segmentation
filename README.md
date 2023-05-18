@@ -21,6 +21,23 @@ These codes make up the framework for segmenting the doppler ultrasound scans.
 
 ## Installation
 
+- To install as a dependency for your project:
+
+``` 
+pip install usseg
+```
+
+or
+
+``` sh
+poetry add usseg
+```
+
+
+### Development Environment
+
+To install the development environment follow the following steps.
+
 - Clone this repository and change into the directory.
 - Install [poetry](https://python-poetry.org/docs/) as per the installation instructions.
 - Install [tesseract](https://github.com/tesseract-ocr/tesseract) as per the intallation instructions.
