@@ -1348,8 +1348,8 @@ def Text_from_greyscale(input_image_filename, COL):
                 if match:
                     value = float(match.group(1))
                     unit = match.group(2) if match.group(2) else ""
-                    df = df.append(
-                        {"Line": i + 1, "Word": word, "Value": value, "Unit": unit},
+                    df = pd.concat(
+                        [df, pd.DataFrame({"Line": i + 1, "Word": word, "Value": value, "Unit": unit})],
                         ignore_index=True,
                     )
                 else:
