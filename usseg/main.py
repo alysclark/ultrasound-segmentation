@@ -5,6 +5,9 @@
 import os
 import sys
 
+# Module imports
+import toml
+
 # Local imports
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 sys.path.append(BASE_DIR)
@@ -26,5 +29,5 @@ def main(root_dir):
     usseg.generate_html_from_pkl()
 
 if __name__ == "__main__":
-    root_dir = "/mnt/veracrypt2/us-data-anon/0000"
+    root_dir = toml.load("config.toml")["root_dir"]
     main(root_dir)
