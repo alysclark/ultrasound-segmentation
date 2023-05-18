@@ -26,9 +26,6 @@ import re
 import pytesseract
 from pytesseract import Output
 
-pytesseract.pytesseract.tesseract_cmd = "C:/Program Files/Tesseract-OCR/tesseract.exe"
-
-
 def Initial_segmentation(input_image_filename):
     """Perform an initial corse segmentation of the waveform.
 
@@ -1230,10 +1227,6 @@ def Text_from_greyscale(input_image_filename, COL):
 
     """
 
-    pytesseract.pytesseract.tesseract_cmd = (
-        "C:/Program Files/Tesseract-OCR/tesseract.exe"
-    )
-
     PIX = COL.load()
     img = cv2.imread(input_image_filename)
     for y in range(
@@ -1355,7 +1348,7 @@ def Text_from_greyscale(input_image_filename, COL):
                 if match:
                     value = float(match.group(1))
                     unit = match.group(2) if match.group(2) else ""
-                    df = df.append(
+                    df = df._append(
                         {"Line": i + 1, "Word": word, "Value": value, "Unit": unit},
                         ignore_index=True,
                     )

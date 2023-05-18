@@ -21,7 +21,25 @@ These codes make up the framework for segmenting the doppler ultrasound scans.
 
 ## Installation
 
-Describe the installation process for your project.
+- Clone this repository and change into the directory.
+- Install [poetry](https://python-poetry.org/docs/) as per the installation instructions.
+- Install [tesseract](https://github.com/tesseract-ocr/tesseract) as per the intallation instructions.
+- Install the package dependencies with:
+```
+poetry install
+
+```
+- Enter into the development shell with:
+
+```
+poetry shell
+```
+
+- You are now in the development environment!
+- Copy `config_example.toml` to `config.toml` and change the variables for your local set up (e.g. path to your data etc.).
+- The main script can now be run in one complete run with `python usseg/main.py`.
+- If debugging in vscode, ensure the python interpreter is set to the virtual environment created poetry. This path can be found using ```poetry env info --path```
+
 
 # Functions
 

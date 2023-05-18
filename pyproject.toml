@@ -1,0 +1,31 @@
+[tool.poetry]
+name = "usseg"
+version = "0.2.0"
+description = "Tools to segment doppler ultrasound signals from scan images."
+authors = ["Dale Kernot <874043@swansea.ac.uk>"]
+license = "GPL-v3-or-later"
+readme = "README.md"
+packages = [{include = "usseg"}]
+
+[tool.poetry.dependencies]
+python = ">=3.10,<3.12"
+matplotlib = "^3.7.1"
+scipy = "^1.10.1"
+scikit-image = "^0.20.0"
+numpy = "^1.24.3"
+opencv-python = "^4.7.0.72"
+nibabel = "^5.1.0"
+pandas = "^2.0.1"
+pytesseract = "^0.3.10"
+openpyxl = "^3.1.2"
+plotly = "^5.14.1"
+toml = "^0.10.2"
+sklearn = "^0.0.post5"
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.3.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

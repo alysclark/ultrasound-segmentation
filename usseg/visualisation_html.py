@@ -1,14 +1,14 @@
+#! /usr/bin/env python3
+
+# Python imports
+import base64
+import pickle
+from PIL import Image
+
+# Module imports
 import plotly.graph_objs as go
 import plotly.offline as pyo
-from PIL import Image
-import base64
 import pandas as pd
-import pickle
-
-# Loading lists from the saved file
-with open('solo_test.pickle', 'rb') as f:
-    scan_paths,Digitized_scans, Annotated_scans,Text_data = pickle.load(f)
-
 
 def generate_html(scans, Annotated_scans, Digitized_scans, tables):
     # Check if the number of scan paths and data tables match
@@ -99,9 +99,16 @@ def generate_html(scans, Annotated_scans, Digitized_scans, tables):
     
     return html_str
 
+def generate_html_from_pkl():
+    """Generates a html file from the previously processed pickle files"""
 
-html_str = generate_html(scan_paths, Annotated_scans, Digitized_scans, Text_data)
-with open('output.html', 'w') as f:
-    f.write(html_str)
+    # Loading lists from the saved file
+    with open('lists3.pickle', 'rb') as f:
+        scan_paths,Digitized_scans, Annotated_scans,Text_data = pickle.load(f)
 
-i=0
+    html_str = generate_html(scan_paths, Annotated_scans, Digitized_scans, Text_data)
+    with open('output.html', 'w') as f:
+        f.write(html_str)
+
+if __name__ == "__main__":
+    generate_html_from_pkl()
