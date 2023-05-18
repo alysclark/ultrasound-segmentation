@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "usseg"
-version = "0.2.0a2"
+version = "0.2.0"
 description = "Tools to segment doppler ultrasound signals from scan images."
 authors = ["Dale Kernot <874043@swansea.ac.uk>"]
 license = "GPL-v3-or-later"
