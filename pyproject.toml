@@ -13,7 +13,6 @@ matplotlib = "^3.7.1"
 scipy = "^1.10.1"
 scikit-image = "^0.20.0"
 numpy = "^1.24.3"
-opencv-python = "^4.7.0.72"
 nibabel = "^5.1.0"
 pandas = "^2.0.1"
 pytesseract = "^0.3.10"
@@ -21,6 +20,7 @@ openpyxl = "^3.1.2"
 plotly = "^5.14.1"
 toml = "^0.10.2"
 scikit-learn = "^1.2.2"
+opencv-contrib-python = "^4.7.0.72"
 
 
 [tool.poetry.group.dev.dependencies]
