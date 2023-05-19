@@ -159,6 +159,26 @@ def Define_end_ROIs(segmentation_mask, Xmin, Xmax, Ymin, Ymax):
     Right_dimensions = [Xmin_R, Xmax_R, Ymin_R, Ymax_R]
     return Left_dimensions, Right_dimensions
 
+def check_inverted_curve(top_curve_mask, Ymax, Ymin, tol=.3):
+    """Checks to see if top curve mask is of an inverted waveform
+
+    Args:
+        top_curve_mask (ndarray) : A binary array showing a curve along the top of the refined waveform.
+        Ymax (float) : Maximum Y coordinate of the segmentation in pixels.
+        Ymin (float) : Minimum Y coordinate of the segmentation in pixels.
+        tol (float, optional) : If the top curve occupies less than tol * (Ymax - Ymin) rows, then
+            the curve is assumed to be inverted (that is True is returned). If the top curve occupies more than
+            or equal to this number of rows, the False is returned and the curve is assumed to be non-inverted.
+            Defaults to 0.3
+
+    Returns:
+        return value (bool) : True if the top curve is of an inverted waveform, False is the top curve is of a non-inverted waveform.
+    """
+    c_rows = np.where(np.sum(top_curve_mask, axis=1))   # Curve rows
+    c_range = np.max(c_rows) - np.min(c_rows)           # Y range of top curve
+    print(c_range / (Ymax - Ymin), tol)
+    return c_range / (Ymax - Ymin) < tol
+
 def Segment_refinement(input_image_filename, Xmin, Xmax, Ymin, Ymax):
     """
     Function to refine the waveform segmentation within the bounds of the corse waveform ROI.
@@ -235,6 +255,12 @@ def Segment_refinement(input_image_filename, Xmin, Xmax, Ymin, Ymax):
     top_curve_mask = refined_segmentation_mask - ws
     for x in range(int(rp[0].centroid[0]), top_curve_mask.shape[0]):
         top_curve_mask[x, :] = 0
+
+    # Checks if waveforms are inverted, if so gets the bottom of the curve
+    if check_inverted_curve(top_curve_mask, Ymax, Ymin):
+        top_curve_mask = refined_segmentation_mask - ws
+        for x in range(top_curve_mask.shape[0], int(rp[0].centroid[0]), -1):
+            top_curve_mask[x, :] = 0
 
     o = list(zip(*np.nonzero(top_curve_mask)))
     np.savetxt("test1.txt", o, fmt="%d")
@@ -1301,7 +1327,7 @@ def Text_from_greyscale(input_image_filename, COL):
         print(group)
 
     # Display image
-    cv2.imshow('img', img)
+    plt.imshow('img', img)
 
     # Analyze the OCR output
     target_words = [
