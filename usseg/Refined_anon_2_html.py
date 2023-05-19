@@ -328,4 +328,6 @@ def segment(filenames=None, output_dir=None, pickle_path=None):
     return (filenames, Digitized_scans, Annotated_scans, Text_data)
 
 if __name__ == "__main__":
-    segment()
+
+    pickle_file = toml.load("config.toml")["pickle"]["likely_us_images"]
+    segment(filenames=pickle_file)
