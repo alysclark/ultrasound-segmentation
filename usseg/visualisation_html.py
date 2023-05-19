@@ -105,7 +105,7 @@ def generate_html_from_pkl():
 
     # Loading lists from the saved file
     pickle_file = toml.load("config.toml")["pickle"]["segmented_data"]
-    with open('lists3.pickle', 'rb') as f:
+    with open(pickle_file, 'rb') as f:
         scan_paths,Digitized_scans, Annotated_scans,Text_data = pickle.load(f)
 
     html_str = generate_html(scan_paths, Annotated_scans, Digitized_scans, Text_data)
