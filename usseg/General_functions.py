@@ -160,7 +160,7 @@ def Define_end_ROIs(segmentation_mask, Xmin, Xmax, Ymin, Ymax):
     Right_dimensions = [Xmin_R, Xmax_R, Ymin_R, Ymax_R]
     return Left_dimensions, Right_dimensions
 
-def check_inverted_curve(top_curve_mask, Ymax, Ymin, tol=.3):
+def check_inverted_curve(top_curve_mask, Ymax, Ymin, tol=.45):
     """Checks to see if top curve mask is of an inverted waveform
 
     Args:
@@ -170,7 +170,7 @@ def check_inverted_curve(top_curve_mask, Ymax, Ymin, tol=.3):
         tol (float, optional) : If the top curve occupies less than tol * (Ymax - Ymin) rows, then
             the curve is assumed to be inverted (that is True is returned). If the top curve occupies more than
             or equal to this number of rows, the False is returned and the curve is assumed to be non-inverted.
-            Defaults to 0.3
+            Defaults to 0.45.
 
     Returns:
         return value (bool) : True if the top curve is of an inverted waveform, False is the top curve is of a non-inverted waveform.
