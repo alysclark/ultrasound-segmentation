@@ -1046,9 +1046,8 @@ def Colour_extract(input_image_filename, vals):
         (img[:, :, 2] <= vals[2][1])
     )] = 255
 
-    return np.zeros(img.shape) + img_rtn
-
-
+    COL = Image.fromarray((np.zeros(img.shape) + img_rtn[:, :, None]).astype('uint8'), 'RGB')
+    return COL
 
 
 def Text_from_greyscale(input_image_filename, COL):
