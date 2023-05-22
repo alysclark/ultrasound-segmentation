@@ -1046,7 +1046,7 @@ def Colour_extract(input_image_filename, vals):
         (img[:, :, 2] <= vals[2][1])
     )] = 255
 
-    return img_rtn
+    return np.zeros(img.shape) + img_rtn
 
 
 
