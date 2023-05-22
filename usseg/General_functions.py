@@ -17,6 +17,7 @@ from scipy.spatial.distance import cdist
 from scipy.signal import find_peaks, peak_widths
 import statistics
 import scipy.linalg
+from sklearn.cluster import DBSCAN
 
 # from matplotlib import path
 # import nibabel as nib
@@ -259,7 +260,7 @@ def Segment_refinement(input_image_filename, Xmin, Xmax, Ymin, Ymax):
     # Checks if waveforms are inverted, if so gets the bottom of the curve
     if check_inverted_curve(top_curve_mask, Ymax, Ymin):
         top_curve_mask = refined_segmentation_mask - ws
-        for x in range(top_curve_mask.shape[0], int(rp[0].centroid[0]), -1):
+        for x in range(0, int(rp[0].centroid[0])):
             top_curve_mask[x, :] = 0
 
     o = list(zip(*np.nonzero(top_curve_mask)))
@@ -1261,7 +1262,6 @@ def Text_from_greyscale(input_image_filename, COL):
         for x in range(COL.size[0]):
             PIX[x, y] = (0, 0, 0)
 
-    import numpy as np
 
     pixels = np.array(COL)
     data = pytesseract.image_to_data(
@@ -1292,7 +1292,6 @@ def Text_from_greyscale(input_image_filename, COL):
         else:
             y_center[i] = 0
         
-    from sklearn.cluster import DBSCAN
 
     def group_similar_numbers(array, tolerance, words):
         # This function groups indexes of words with similar y-coordinate center
@@ -1327,7 +1326,7 @@ def Text_from_greyscale(input_image_filename, COL):
         print(group)
 
     # Display image
-    plt.imshow('img', img)
+    plt.imshow(img)
 
     # Analyze the OCR output
     target_words = [
