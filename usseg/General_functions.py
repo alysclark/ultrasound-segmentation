@@ -854,6 +854,10 @@ def Plot_Digitized_data(Rticks, Rlocs, Lticks, Llocs):
         (i - YminScale) / (YmaxScale - YminScale) * (Ymax - Ymin) + Ymin for i in Y
     ]
 
+    # Inverts the waveform if need be
+    if np.mean(Yplot) < 0:
+        Yplot = [ y * (-1) for y in Yplot]
+
     print(Xmin, Xmax)
     plt.figure(2)
     plt.plot(Xplot, Yplot, "-")
