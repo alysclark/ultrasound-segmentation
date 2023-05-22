@@ -1024,64 +1024,31 @@ def Annotate(
     return img_RGB
 
 
-def Colour_extract(input_image_filename, TargetRGB, cyl_length, cyl_radius):
+def Colour_extract(input_image_filename, vals):
     """Function for extracing target colours from image
-    converts image to RGB space and find coordinates of pixels within a
-    cylinder whose center is the target triplet. You can visualise this
-    by removing commented plot statements throughout this function.
 
     Args:
         input_image_filename (str) : Name of file within current directory, or path to a file.
-        TargetRGB (list) : triplet of target Red Green Blue colour [Red,Green,Blue].
-        cyl_length (int) : length of cylinder.
-        cyl_radius (int) : radius of cylinder.
+        vals (tuple) : Tuple pairs of min and max values for each R, G, B.
 
     Returns:
         COL (JpegImageFile) : PIL JpegImageFile of the filtered image highlighting yellow text.
     """
     img = np.array(Image.open(input_image_filename).convert('RGB'))
-    max_colour = (256, 256, 256)
-    mask = np.zeros(max_colour)
-    R, G, B = TargetRGB
+    img_rtn = np.zeros((img.shape[0], img.shape[1]))
 
-    # Creates a cylinder with radius cyl_radius and length cyl_length about the target colour.
-    for k in range(mask.shape[2]):
-        db = k - B
-        for j in range(mask.shape[1]):
-            dg = j - G
-            for i in range(mask.shape[0]):
-                dr = i - R
-                if np.sqrt(dr ** 2 + dg ** 2) <= cyl_radius and np.abs(db) <= cyl_length / 2:
-                    mask[i, j, k] = 1
+    img_rtn[np.where(
+        (img[:, :, 0] >= vals[0][0]) &
+        (img[:, :, 0] <= vals[0][1]) &
+        (img[:, :, 1] >= vals[1][0]) &
+        (img[:, :, 1] <= vals[1][1]) &
+        (img[:, :, 2] >= vals[2][0]) &
+        (img[:, :, 2] <= vals[2][1])
+    )] = 255
 
-    # Rotates the cyclinder with respect to the direction of the colour vector
-    # Euler angles with gamma = 0
-    alpha = np.arctan(G/R)
-    beta = - np.arctan(B / np.sqrt(R**2 + G**2))
-    rotation_matrix = np.array([
-        [np.cos(beta), np.sin(alpha) * np.sin(beta), np.cos(alpha) * np.sin(beta)],
-        [0, np.cos(alpha), - np.sin(alpha)],
-        [-np.sin(beta), np.sin(alpha) * np.cos(beta), np.cos(alpha) * np.cos(beta)],
-    ])
+    return img_rtn
 
-    mask_rot = np.zeros(mask.shape)
-    mask_coords = np.array(np.where(mask))
-    TargetRGB = np.array(TargetRGB)
-    for i in range(mask_coords.shape[1]):
-        vec = mask_coords[:, i] - TargetRGB
-        vec_rot = np.matmul(rotation_matrix, vec) + TargetRGB
-        if np.all(max_colour - vec_rot >= 0): # Checks within colour range
-            mask_rot[int(vec_rot[0]), int(vec_rot[1]), int(vec_rot[2])] = 1
 
-    for y in range(img.shape[1]):
-        for x in range(img.shape[0]):
-            r, g, b = img[x, y]
-            if mask_rot[r, g, b] == 1:
-                img[x, y] = 255
-            else:
-                img[x, y] = 0
-
-    return img
 
 
 def Text_from_greyscale(input_image_filename, COL):
