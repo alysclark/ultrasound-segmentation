@@ -857,8 +857,6 @@ def Plot_Digitized_data(Rticks, Rlocs, Lticks, Llocs):
     print(Xmin, Xmax)
     plt.figure(2)
     plt.plot(Xplot, Yplot, "-")
-    plt.xlim((Xmin, Xmax))
-    plt.ylim((0, max(Yplot) + 10))
     plt.xlabel("Arbitrary time scale")
     plt.ylabel("Flowrate (cm/s)")
     return Xplot, Yplot
