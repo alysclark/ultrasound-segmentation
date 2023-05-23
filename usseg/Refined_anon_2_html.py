@@ -136,7 +136,7 @@ def segment(filenames=None, output_dir=None, pickle_path=None):
             )  # Loads a pixel access object, where pixel values can be edited
 
             # from General_functions import Colour_extract, Text_from_greyscale
-            col_vals = ((220, 255), (220, 255), (70, 160))
+            col_vals = ((210, 255), (210, 255), (60, 170))
             COL = General_functions.Colour_extract(input_image_filename, col_vals)
             print("Done Colour extract")
 
