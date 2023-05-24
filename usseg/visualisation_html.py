@@ -9,6 +9,7 @@ from PIL import Image
 import plotly.graph_objs as go
 import plotly.offline as pyo
 import pandas as pd
+import toml
 
 def generate_html(scans, Annotated_scans, Digitized_scans, tables):
     # Check if the number of scan paths and data tables match
@@ -103,7 +104,8 @@ def generate_html_from_pkl():
     """Generates a html file from the previously processed pickle files"""
 
     # Loading lists from the saved file
-    with open('lists3.pickle', 'rb') as f:
+    pickle_file = toml.load("config.toml")["pickle"]["segmented_data"]
+    with open(pickle_file, 'rb') as f:
         scan_paths,Digitized_scans, Annotated_scans,Text_data = pickle.load(f)
 
     html_str = generate_html(scan_paths, Annotated_scans, Digitized_scans, Text_data)

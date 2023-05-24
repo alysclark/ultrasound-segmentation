@@ -20,10 +20,10 @@ def main(root_dir):
     usseg.setup_tesseract()
 
     # Gets a list of likely ultrasound images from root dir and saves them to a pickle file.
-    usseg.get_likely_us(root_dir)
+    filenames = usseg.get_likely_us(root_dir)
 
     # Segments and digitises the pre-selected ultrasound images.
-    usseg.segment()
+    usseg.segment(filenames)
 
     # Generates an output.html of the segmented output
     usseg.generate_html_from_pkl()

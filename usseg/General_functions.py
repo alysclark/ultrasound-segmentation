@@ -17,6 +17,7 @@ from scipy.spatial.distance import cdist
 from scipy.signal import find_peaks, peak_widths
 import statistics
 import scipy.linalg
+from sklearn.cluster import DBSCAN
 
 # from matplotlib import path
 # import nibabel as nib
@@ -159,6 +160,26 @@ def Define_end_ROIs(segmentation_mask, Xmin, Xmax, Ymin, Ymax):
     Right_dimensions = [Xmin_R, Xmax_R, Ymin_R, Ymax_R]
     return Left_dimensions, Right_dimensions
 
+def check_inverted_curve(top_curve_mask, Ymax, Ymin, tol=.45):
+    """Checks to see if top curve mask is of an inverted waveform
+
+    Args:
+        top_curve_mask (ndarray) : A binary array showing a curve along the top of the refined waveform.
+        Ymax (float) : Maximum Y coordinate of the segmentation in pixels.
+        Ymin (float) : Minimum Y coordinate of the segmentation in pixels.
+        tol (float, optional) : If the top curve occupies less than tol * (Ymax - Ymin) rows, then
+            the curve is assumed to be inverted (that is True is returned). If the top curve occupies more than
+            or equal to this number of rows, the False is returned and the curve is assumed to be non-inverted.
+            Defaults to 0.45.
+
+    Returns:
+        return value (bool) : True if the top curve is of an inverted waveform, False is the top curve is of a non-inverted waveform.
+    """
+    c_rows = np.where(np.sum(top_curve_mask, axis=1))   # Curve rows
+    c_range = np.max(c_rows) - np.min(c_rows)           # Y range of top curve
+    print(c_range / (Ymax - Ymin), tol)
+    return c_range / (Ymax - Ymin) < tol
+
 def Segment_refinement(input_image_filename, Xmin, Xmax, Ymin, Ymax):
     """
     Function to refine the waveform segmentation within the bounds of the corse waveform ROI.
@@ -235,6 +256,12 @@ def Segment_refinement(input_image_filename, Xmin, Xmax, Ymin, Ymax):
     top_curve_mask = refined_segmentation_mask - ws
     for x in range(int(rp[0].centroid[0]), top_curve_mask.shape[0]):
         top_curve_mask[x, :] = 0
+
+    # Checks if waveforms are inverted, if so gets the bottom of the curve
+    if check_inverted_curve(top_curve_mask, Ymax, Ymin):
+        top_curve_mask = refined_segmentation_mask - ws
+        for x in range(0, int(rp[0].centroid[0])):
+            top_curve_mask[x, :] = 0
 
     o = list(zip(*np.nonzero(top_curve_mask)))
     np.savetxt("test1.txt", o, fmt="%d")
@@ -827,11 +854,13 @@ def Plot_Digitized_data(Rticks, Rlocs, Lticks, Llocs):
         (i - YminScale) / (YmaxScale - YminScale) * (Ymax - Ymin) + Ymin for i in Y
     ]
 
+    # Inverts the waveform if need be
+    if np.mean(Yplot) < 0:
+        Yplot = [ y * (-1) for y in Yplot]
+
     print(Xmin, Xmax)
     plt.figure(2)
     plt.plot(Xplot, Yplot, "-")
-    plt.xlim((Xmin, Xmax))
-    plt.ylim((0, max(Yplot) + 10))
     plt.xlabel("Arbitrary time scale")
     plt.ylabel("Flowrate (cm/s)")
     return Xplot, Yplot
@@ -1235,7 +1264,6 @@ def Text_from_greyscale(input_image_filename, COL):
         for x in range(COL.size[0]):
             PIX[x, y] = (0, 0, 0)
 
-    import numpy as np
 
     pixels = np.array(COL)
     data = pytesseract.image_to_data(
@@ -1266,7 +1294,6 @@ def Text_from_greyscale(input_image_filename, COL):
         else:
             y_center[i] = 0
         
-    from sklearn.cluster import DBSCAN
 
     def group_similar_numbers(array, tolerance, words):
         # This function groups indexes of words with similar y-coordinate center
@@ -1301,7 +1328,7 @@ def Text_from_greyscale(input_image_filename, COL):
         print(group)
 
     # Display image
-    cv2.imshow('img', img)
+    plt.imshow(img)
 
     # Analyze the OCR output
     target_words = [
