@@ -176,7 +176,7 @@ def check_inverted_curve(top_curve_mask, Ymax, Ymin, tol=.25):
     """
     c_rows = np.where(np.sum(top_curve_mask, axis=1))   # Curve rows
     c_range = np.max(c_rows) - np.min(c_rows)           # Y range of top curve
-    print(c_range / (Ymax - Ymin), tol)
+    #print(c_range / (Ymax - Ymin), tol)
     return c_range / (Ymax - Ymin) < tol
 
 def Segment_refinement(input_image_obj, Xmin, Xmax, Ymin, Ymax):
@@ -569,7 +569,7 @@ def Search_for_labels(
         if retry == 0:
             break
 
-    print(number)
+    # print(number)
 
     # d = pytesseract.image_to_data(
     #     ROIAX,
@@ -740,7 +740,7 @@ def Search_for_labels(
                 dist.append(diff)
             elif lst.index(0) == lst.index(i):
                 dist.append(0)
-        print(dist)
+        # print(dist)
 
         dist_divided = []
         for i in range(0, length):
@@ -776,8 +776,8 @@ def Search_for_labels(
             int(Right_dimensions[0]) : int(Right_dimensions[1]),
         ] = ROI3  # Left ROI
 
-    print(number)
-    print(positions)
+    # print(number)
+    # print(positions)
 
     return ROIAX, number, positions, empty_to_fill
 
@@ -787,29 +787,29 @@ def Plot_Digitized_data(Rticks, Rlocs, Lticks, Llocs):
 
     Rticks = list(map(int, Rticks))
     XmaxtickR = max(Rticks)
-    print("Max tick R:", XmaxtickR)
+    # print("Max tick R:", XmaxtickR)
     XmaxidR = Rticks.index(XmaxtickR)
     XmaxR = Rlocs[XmaxidR][0]
     YmaxR = Rlocs[XmaxidR][1]
-    print("X max R:", XmaxR)
+    # print("X max R:", XmaxR)
     XMintickR = min(Rticks)
-    print("Min tick R:", XMintickR)
+    # print("Min tick R:", XMintickR)
     XMinidR = Rticks.index(XMintickR)
     XminR = Rlocs[XMinidR][0]
-    print("X min R:", XminR)
+    # print("X min R:", XminR)
     #
     Lticks = list(map(int, Lticks))
     XmaxtickL = max(Lticks)
-    print("Max tick L:", XmaxtickL)
+    # print("Max tick L:", XmaxtickL)
     XmaxidL = Lticks.index(XmaxtickL)
     XmaxL = Llocs[XmaxidL][0]
-    print("X max L:", XmaxL)
+    # print("X max L:", XmaxL)
     XMintickL = min(Lticks)
-    print("Min tick L:", XMintickL)
+    # print("Min tick L:", XMintickL)
     XminidL = Lticks.index(XMintickL)
     XminL = Llocs[XminidL][0]
     YminL = Llocs[XminidL][1]
-    print("X min L:", XminL)
+    # print("X min L:", XminL)
 
     # Yplots = [Llocs[XmaxidL][0], Llocs[XminidL][0], Rlocs[XmaxidR][0]]
     # Xplots = [Llocs[XmaxidL][1], Llocs[XminidL][1], Rlocs[XmaxidR][1]]
@@ -859,7 +859,7 @@ def Plot_Digitized_data(Rticks, Rlocs, Lticks, Llocs):
     if np.mean(Yplot) < 0:
         Yplot = [ y * (-1) for y in Yplot]
 
-    print(Xmin, Xmax)
+    # print(Xmin, Xmax)
     plt.figure(2)
     plt.plot(Xplot, Yplot, "-")
     plt.xlabel("Arbitrary time scale")
@@ -1270,7 +1270,7 @@ def Text_from_greyscale(input_image_obj, COL):
     data = pytesseract.image_to_data(
         pixels, output_type=Output.DICT, lang="eng", config="--psm 3 "
     )
-    print(len(data["text"]))
+    # print(len(data["text"]))
     if (
         len(data["text"]) < 30
     ):  # This is rough, if more than 30 objects found then highly likley it is a waveform scan.
@@ -1325,8 +1325,8 @@ def Text_from_greyscale(input_image_obj, COL):
     tolerance = 3  # Adjust the tolerance value - the max difference between y-coords considered on the same line
     grouped_words = group_similar_numbers(y_center, tolerance, data["text"])
 
-    for group in grouped_words:
-        print(group)
+    # for group in grouped_words:
+    #     # print(group)
 
     # Display image
     plt.imshow(img)
@@ -1390,7 +1390,7 @@ def Text_from_greyscale(input_image_obj, COL):
 
     # Print DataFrame
     # print(input_image_obj)
-    print(df)
+    # print(df)
 
     # # Display the result
     # cv2.imshow('Result', img)
@@ -1480,10 +1480,10 @@ def Scan_type_test(input_image_filename):
     for target in target_words:
         for word in lines:
             if target in word:
-                print(f"{target} found in {word}")
+                # print(f"{target} found in {word}")
                 Fail = 0 # If any of the words are found, then no fail.
         # Print DataFrame
-    print(input_image_filename) # Print the file name just processed
+    # print(input_image_filename) # Print the file name just processed
 
     return Fail, df  # Return the fail variable and dataframe contraining extracted text.
 
