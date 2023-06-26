@@ -90,8 +90,8 @@ def get_likely_us(root_dir, pickle_path=None):
         with open(pickle_path, 'wb') as f:
             pickle.dump(patient_paths, f)
 
-    return patient_paths
-
+    return pickle_path
+    
 if __name__ == "__main__":
 
     root_dir = toml.load("config.toml")["root_dir"]

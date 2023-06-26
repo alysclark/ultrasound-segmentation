@@ -27,7 +27,7 @@ import re
 import pytesseract
 from pytesseract import Output
 
-def Initial_segmentation(input_image_filename):
+def Initial_segmentation(input_image_obj):
     """Perform an initial corse segmentation of the waveform.
 
     Args:
@@ -40,8 +40,8 @@ def Initial_segmentation(input_image_filename):
         Ymin (float) : Minimum Y coordinate of the segmentation.
         Ymax (float) : Maximum Y coordinate of the segmentation.
     """
-    img_RGBA = Image.open(input_image_filename)  # These images are in RGBA form
-    img_RGB = img_RGBA.convert("RGB")  # We need RGB, so convert here.
+    # img_RGBA = Image.open(input_image_filename)  # These images are in RGBA form
+    img_RGB = input_image_obj
     pixel_data = img_RGB.load()  # Loads a pixel access object, where pixel values can be edited
     # gry = img_RGB.convert("L")  # (returns grayscale version)
 
@@ -114,7 +114,6 @@ def Initial_segmentation(input_image_filename):
 
     return segmentation_mask, Xmin, Xmax, Ymin, Ymax
 
-
 def Define_end_ROIs(segmentation_mask, Xmin, Xmax, Ymin, Ymax):
     """
     Function to define regions adjacent to the corse waveform in which to search for axes info.
@@ -160,7 +159,7 @@ def Define_end_ROIs(segmentation_mask, Xmin, Xmax, Ymin, Ymax):
     Right_dimensions = [Xmin_R, Xmax_R, Ymin_R, Ymax_R]
     return Left_dimensions, Right_dimensions
 
-def check_inverted_curve(top_curve_mask, Ymax, Ymin, tol=.45):
+def check_inverted_curve(top_curve_mask, Ymax, Ymin, tol=.25):
     """Checks to see if top curve mask is of an inverted waveform
 
     Args:
@@ -177,10 +176,10 @@ def check_inverted_curve(top_curve_mask, Ymax, Ymin, tol=.45):
     """
     c_rows = np.where(np.sum(top_curve_mask, axis=1))   # Curve rows
     c_range = np.max(c_rows) - np.min(c_rows)           # Y range of top curve
-    print(c_range / (Ymax - Ymin), tol)
+    #print(c_range / (Ymax - Ymin), tol)
     return c_range / (Ymax - Ymin) < tol
 
-def Segment_refinement(input_image_filename, Xmin, Xmax, Ymin, Ymax):
+def Segment_refinement(input_image_obj, Xmin, Xmax, Ymin, Ymax):
     """
     Function to refine the waveform segmentation within the bounds of the corse waveform ROI.
 
@@ -198,7 +197,7 @@ def Segment_refinement(input_image_filename, Xmin, Xmax, Ymin, Ymax):
     # Refine segmentation to increase smoothing
     # Save output to .txt file to load later.
 
-    image = cv2.imread(input_image_filename)
+    image = input_image_obj
     input_image_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     ret, thresholded_image = cv2.threshold(input_image_gray, 30, 255, 0)
     thresholded_image[:, int(Xmax) : -1] = 0
@@ -268,7 +267,7 @@ def Segment_refinement(input_image_filename, Xmin, Xmax, Ymin, Ymax):
 
     return refined_segmentation_mask, top_curve_mask
 
-def Search_for_ticks(input_image_filename, Side, Left_dimensions, Right_dimensions):
+def Search_for_ticks(input_image_obj, Side, Left_dimensions, Right_dimensions):
     """
     Function to search for the ticks in either of the axes ROIs
 
@@ -293,7 +292,7 @@ def Search_for_ticks(input_image_filename, Side, Left_dimensions, Right_dimensio
         ROI3
     """
 
-    image = cv2.imread(input_image_filename)
+    image = input_image_obj
     thresholded_image = image
 
     if Side == "Left":
@@ -318,7 +317,7 @@ def Search_for_ticks(input_image_filename, Side, Left_dimensions, Right_dimensio
     W = morphology.remove_small_objects(nonzero_pixels, 20, connectivity=2)
     W = W.astype(float)
 
-    im = cv2.imread(input_image_filename)
+    im = input_image_obj
     input_image_gray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
     ret, thresholded_image = cv2.threshold(input_image_gray, 127, 255, 0)
 
@@ -529,12 +528,12 @@ def Search_for_labels(
     Side,
     Left_dimensions,
     Right_dimensions,
-    input_image_filename,
+    input_image_obj,
     ROI2,
     ROI3,
 ):
     for thresh_value in np.arange(100, 190, 5): # Threshold to optimise the resulting text extraction.
-        image = cv2.imread(input_image_filename)
+        image = input_image_obj
         input_image_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         ret, thresholded_image = cv2.threshold(input_image_gray, thresh_value, 255, 0)
         if Side == "Left":
@@ -570,7 +569,7 @@ def Search_for_labels(
         if retry == 0:
             break
 
-    print(number)
+    # print(number)
 
     # d = pytesseract.image_to_data(
     #     ROIAX,
@@ -741,7 +740,7 @@ def Search_for_labels(
                 dist.append(diff)
             elif lst.index(0) == lst.index(i):
                 dist.append(0)
-        print(dist)
+        # print(dist)
 
         dist_divided = []
         for i in range(0, length):
@@ -777,8 +776,8 @@ def Search_for_labels(
             int(Right_dimensions[0]) : int(Right_dimensions[1]),
         ] = ROI3  # Left ROI
 
-    print(number)
-    print(positions)
+    # print(number)
+    # print(positions)
 
     return ROIAX, number, positions, empty_to_fill
 
@@ -788,29 +787,29 @@ def Plot_Digitized_data(Rticks, Rlocs, Lticks, Llocs):
 
     Rticks = list(map(int, Rticks))
     XmaxtickR = max(Rticks)
-    print("Max tick R:", XmaxtickR)
+    # print("Max tick R:", XmaxtickR)
     XmaxidR = Rticks.index(XmaxtickR)
     XmaxR = Rlocs[XmaxidR][0]
     YmaxR = Rlocs[XmaxidR][1]
-    print("X max R:", XmaxR)
+    # print("X max R:", XmaxR)
     XMintickR = min(Rticks)
-    print("Min tick R:", XMintickR)
+    # print("Min tick R:", XMintickR)
     XMinidR = Rticks.index(XMintickR)
     XminR = Rlocs[XMinidR][0]
-    print("X min R:", XminR)
+    # print("X min R:", XminR)
     #
     Lticks = list(map(int, Lticks))
     XmaxtickL = max(Lticks)
-    print("Max tick L:", XmaxtickL)
+    # print("Max tick L:", XmaxtickL)
     XmaxidL = Lticks.index(XmaxtickL)
     XmaxL = Llocs[XmaxidL][0]
-    print("X max L:", XmaxL)
+    # print("X max L:", XmaxL)
     XMintickL = min(Lticks)
-    print("Min tick L:", XMintickL)
+    # print("Min tick L:", XMintickL)
     XminidL = Lticks.index(XMintickL)
     XminL = Llocs[XminidL][0]
     YminL = Llocs[XminidL][1]
-    print("X min L:", XminL)
+    # print("X min L:", XminL)
 
     # Yplots = [Llocs[XmaxidL][0], Llocs[XminidL][0], Rlocs[XmaxidR][0]]
     # Xplots = [Llocs[XmaxidL][1], Llocs[XminidL][1], Rlocs[XmaxidR][1]]
@@ -820,7 +819,7 @@ def Plot_Digitized_data(Rticks, Rlocs, Lticks, Llocs):
     Ymin = XMintickL
     Ymax = XmaxtickL
 
-    b = np.loadtxt("test1.txt", dtype=float)
+    b = np.loadtxt("test1.txt", dtype=float) # Loading in data from Segment_refinement
     b = sorted(b, key=lambda k: [k[1], k[0]])
 
     b = [B.tolist() for B in b]
@@ -829,8 +828,8 @@ def Plot_Digitized_data(Rticks, Rlocs, Lticks, Llocs):
     b = pd.DataFrame(b).groupby(0, as_index=False)[1].mean().values.tolist()
     b = [x[::-1] for x in b]
 
-    X = [XminL, XmaxR]  # ,231,429,620,820,1011,0]
-    Y = [YminL, YmaxR]  # ,558,554,554,558,566,0]
+    X = [XminL, XmaxR]  
+    Y = [YminL, YmaxR] 
 
     for i in range(0, len(b)):
         if b[i][1] >= XminL + 20 and b[i][1] <= XmaxR - 20:
@@ -843,6 +842,8 @@ def Plot_Digitized_data(Rticks, Rlocs, Lticks, Llocs):
     XmaxScale = topRight[0]
     YminScale = origin[1]
     YmaxScale = topRight[1]
+
+    Ynought = [(0 - YminScale) / (YmaxScale - YminScale) * (Ymax - Ymin) + Ymin]
 
     X = X[2:-1]
     Y = Y[2:-1]
@@ -858,12 +859,12 @@ def Plot_Digitized_data(Rticks, Rlocs, Lticks, Llocs):
     if np.mean(Yplot) < 0:
         Yplot = [ y * (-1) for y in Yplot]
 
-    print(Xmin, Xmax)
+    # print(Xmin, Xmax)
     plt.figure(2)
     plt.plot(Xplot, Yplot, "-")
     plt.xlabel("Arbitrary time scale")
     plt.ylabel("Flowrate (cm/s)")
-    return Xplot, Yplot
+    return Xplot, Yplot, Ynought
 
 
 def Plot_correction(Xplot, Yplot, df):
@@ -962,7 +963,7 @@ def Plot_correction(Xplot, Yplot, df):
 
 
 def Annotate(
-    input_image_filename,
+    input_image_obj,
     refined_segmentation_mask,
     Left_dimensions,
     Right_dimensions,
@@ -991,8 +992,8 @@ def Annotate(
     refined_segmentation_mask[rr, cc] = 2  # set color white
     refined_segmentation_mask[rrL, ccL] = 2
     refined_segmentation_mask[rrR, ccR] = 2
-    img_RGBA = Image.open(input_image_filename)
-    img_RGB = img_RGBA  # .convert('RGB')
+
+    img_RGB = input_image_obj  # .convert('RGB')
     pixel_data = img_RGB.load()
     # gry = img_RGB.convert("L")  # returns grayscale version.
 
@@ -1024,7 +1025,7 @@ def Annotate(
     return img_RGB
 
 
-def Colour_extract(input_image_filename, TargetRGB, cyl_length, cyl_radius):
+def Colour_extract(input_image_obj, TargetRGB, cyl_length, cyl_radius):
     """Function for extracing target colours from image
     converts image to RGB space and find coordinates of pixels within a
     cylinder whose center is the target triplet. You can visualise this
@@ -1039,7 +1040,7 @@ def Colour_extract(input_image_filename, TargetRGB, cyl_length, cyl_radius):
     Returns:
         COL (JpegImageFile) : PIL JpegImageFile of the filtered image highlighting yellow text.
     """
-    col4 = Image.open(input_image_filename)
+    col4 = input_image_obj
     pix4 = col4.load()
 
     # DEFINE END POINTS OF CYLINDER
@@ -1182,7 +1183,7 @@ def Colour_extract(input_image_filename, TargetRGB, cyl_length, cyl_radius):
 
         return logi
 
-    col4 = Image.open(input_image_filename)
+    col4 = input_image_obj
     pix4 = col4.load()
     gry4 = col4.convert("L")  # returns grayscale version.
 
@@ -1224,7 +1225,7 @@ def Colour_extract(input_image_filename, TargetRGB, cyl_length, cyl_radius):
     #plt.show()
 
     ## COMBINE
-    COL = Image.open(input_image_filename)
+    COL = input_image_obj
     COL = COL.convert("RGB")  # We need RGB, so convert here.
     PIX = COL.load()
 
@@ -1242,7 +1243,7 @@ def Colour_extract(input_image_filename, TargetRGB, cyl_length, cyl_radius):
     return COL
 
 
-def Text_from_greyscale(input_image_filename, COL):
+def Text_from_greyscale(input_image_obj, COL):
     """
     Function for extracting text from the yellow filtered image.
 
@@ -1257,7 +1258,7 @@ def Text_from_greyscale(input_image_filename, COL):
     """
 
     PIX = COL.load()
-    img = cv2.imread(input_image_filename)
+    img = input_image_obj
     for y in range(
         int(COL.size[1] * 0.45), COL.size[1]
     ):  # Exclude bottom 3rd of image - these are fails
@@ -1269,7 +1270,7 @@ def Text_from_greyscale(input_image_filename, COL):
     data = pytesseract.image_to_data(
         pixels, output_type=Output.DICT, lang="eng", config="--psm 3 "
     )
-    print(len(data["text"]))
+    # print(len(data["text"]))
     if (
         len(data["text"]) < 30
     ):  # This is rough, if more than 30 objects found then highly likley it is a waveform scan.
@@ -1324,8 +1325,8 @@ def Text_from_greyscale(input_image_filename, COL):
     tolerance = 3  # Adjust the tolerance value - the max difference between y-coords considered on the same line
     grouped_words = group_similar_numbers(y_center, tolerance, data["text"])
 
-    for group in grouped_words:
-        print(group)
+    # for group in grouped_words:
+    #     # print(group)
 
     # Display image
     plt.imshow(img)
@@ -1381,15 +1382,15 @@ def Text_from_greyscale(input_image_filename, COL):
                     )
                 else:
                     print("couldn't find numeric data for line")
-                    df = df.append(
+                    df = df._append(
                         {"Line": i + 1, "Word": word, "Value": 0, "Unit": 0},
                         ignore_index=True,
                     )
                     pass
 
     # Print DataFrame
-    print(input_image_filename)
-    print(df)
+    # print(input_image_obj)
+    # print(df)
 
     # # Display the result
     # cv2.imshow('Result', img)
@@ -1479,10 +1480,10 @@ def Scan_type_test(input_image_filename):
     for target in target_words:
         for word in lines:
             if target in word:
-                print(f"{target} found in {word}")
+                # print(f"{target} found in {word}")
                 Fail = 0 # If any of the words are found, then no fail.
         # Print DataFrame
-    print(input_image_filename) # Print the file name just processed
+    # print(input_image_filename) # Print the file name just processed
 
     return Fail, df  # Return the fail variable and dataframe contraining extracted text.
 
