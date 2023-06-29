@@ -240,12 +240,10 @@ def segment(filenames=None, output_dir=None, pickle_path=None):
             pass
 
         try:
-            Xplot, Yplot, Ynought = General_functions.Plot_Digitized_data(
-                Rticks=Rnumber, Rlocs=Rpositions, Lticks=Lnumber, Llocs=Lpositions
-            )
-            
             try:  # Refine segmentation
-                refined_segmentation_mask, top_curve_mask = General_functions.Segment_refinement(
+                (
+                    refined_segmentation_mask, top_curve_mask, top_curve_coords
+                ) = General_functions.Segment_refinement(
                     cv2_img, Xmin, Xmax, Ymin, Ymax
                 )
             except Exception:
@@ -253,6 +251,11 @@ def segment(filenames=None, output_dir=None, pickle_path=None):
                 print("Failed Segment refinement")
                 Fail = Fail + 1
                 pass
+
+            Xplot, Yplot, Ynought = General_functions.Plot_Digitized_data(
+                Rnumber, Rpositions, Lnumber, Lpositions, top_curve_coords,
+            )
+            
 
             col = General_functions.Annotate(
                 input_image_obj=colRGBA,
@@ -283,6 +286,7 @@ def segment(filenames=None, output_dir=None, pickle_path=None):
             plt.figure(2)
             plt.savefig(Digitized_path, dpi=900, bbox_inches="tight", pad_inches=0)
             Digitized_scans.append(Digitized_path)
+
         except Exception:
             print("Failed Digitization")
             Annotated_scans.append(None)

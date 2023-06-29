@@ -140,28 +140,23 @@ def data_from_image(PIL_img,cv2_img):
         Fail = Fail + 1
         pass
 
-    try:
-        Xplot, Yplot, Ynought = General_functions.Plot_Digitized_data(
-            Rticks=Rnumber, Rlocs=Rpositions, Lticks=Lnumber, Llocs=Lpositions
+    try:  # Refine segmentation
+        (
+            refined_segmentation_mask, top_curve_mask, top_curve_coords
+        ) = General_functions.Segment_refinement(
+            cv2_img, Xmin, Xmax, Ymin, Ymax
         )
-        
-        try:  # Refine segmentation
-            refined_segmentation_mask, top_curve_mask = General_functions.Segment_refinement(
-                cv2_img, Xmin, Xmax, Ymin, Ymax
-            )
-        except Exception:
-            traceback.print_exc()  # prints the error message and traceback
-            print("Failed Segment refinement")
-            Fail = Fail + 1
-            pass
+    except Exception:
+        traceback.print_exc()  # prints the error message and traceback
+        print("Failed Segment refinement")
+        Fail = Fail + 1
+        pass
 
-        try:
-            df = General_functions.Plot_correction(Xplot, Yplot, df)
-            Text_data.append(df)
-        except Exception:
-            traceback.print_exc()
-            print("Failed correction")
-            pass
+    try: 
+        Xplot, Yplot, Ynought = General_functions.Plot_Digitized_data(
+            Rnumber, Rpositions, Lnumber, Lpositions, top_curve_coords,
+        )
+
     except Exception:
         print("Failed Digitization")
         traceback.print_exc()
@@ -173,6 +168,13 @@ def data_from_image(PIL_img,cv2_img):
         Fail = Fail + 1
         pass
 
+    try:
+        df = General_functions.Plot_correction(Xplot, Yplot, df)
+        Text_data.append(df)
+    except Exception:
+        traceback.print_exc()
+        print("Failed correction")
+        pass
     to_del = [
         "df",
         "image_name",
