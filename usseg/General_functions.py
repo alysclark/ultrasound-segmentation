@@ -192,6 +192,7 @@ def Segment_refinement(input_image_obj, Xmin, Xmax, Ymin, Ymax):
     Returns:
         refined_segmentation_mask (ndarray) :  A binary array mask showing the refined segmentation of waveform (1) against background (0).
         top_curve_mask (ndarray) : A binary array showing a curve along the top of the refined waveform.
+    	top_curve_coords (ndarray) : A list of the coordinates for the top curve.
     """
 
     # Refine segmentation to increase smoothing
@@ -262,10 +263,9 @@ def Segment_refinement(input_image_obj, Xmin, Xmax, Ymin, Ymax):
         for x in range(0, int(rp[0].centroid[0])):
             top_curve_mask[x, :] = 0
 
-    o = list(zip(*np.nonzero(top_curve_mask)))
-    np.savetxt("test1.txt", o, fmt="%d")
+    top_curve_coords = np.array(list(zip(*np.nonzero(top_curve_mask))))
 
-    return refined_segmentation_mask, top_curve_mask
+    return refined_segmentation_mask, top_curve_mask, top_curve_coords
 
 def Search_for_ticks(input_image_obj, Side, Left_dimensions, Right_dimensions):
     """
@@ -782,7 +782,7 @@ def Search_for_labels(
     return ROIAX, number, positions, empty_to_fill
 
 
-def Plot_Digitized_data(Rticks, Rlocs, Lticks, Llocs):
+def Plot_Digitized_data(Rticks, Rlocs, Lticks, Llocs, top_curve_coords):
     # Function to digitize the segmetned data:
 
     Rticks = list(map(int, Rticks))
@@ -819,7 +819,7 @@ def Plot_Digitized_data(Rticks, Rlocs, Lticks, Llocs):
     Ymin = XMintickL
     Ymax = XmaxtickL
 
-    b = np.loadtxt("test1.txt", dtype=float) # Loading in data from Segment_refinement
+    b = top_curve_coords
     b = sorted(b, key=lambda k: [k[1], k[0]])
 
     b = [B.tolist() for B in b]
