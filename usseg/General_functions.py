@@ -1,7 +1,12 @@
 """ A set of functions to segment and extract data from doppler ultrasound scans"""
 
+# Python imports
+import traceback
+import math
+import re
+import logging
+
 # Module imports
-from PIL import Image
 import matplotlib.pyplot as plt
 from skimage import morphology, measure
 import numpy as np
@@ -9,23 +14,20 @@ from skimage.measure import find_contours
 from skimage.draw import polygon_perimeter
 import cv2
 import scipy
-import traceback
 from scipy.ndimage.filters import gaussian_filter
-import math
 from scipy import signal
 from scipy.spatial.distance import cdist
 from scipy.signal import find_peaks, peak_widths
 import statistics
 import scipy.linalg
 from sklearn.cluster import DBSCAN
-
-# from matplotlib import path
-# import nibabel as nib
-# from mpl_toolkits.mplot3d import Axes3D
 import pandas as pd
-import re
 import pytesseract
 from pytesseract import Output
+
+
+logger = logging.getLogger(__file__)
+
 
 def Initial_segmentation(input_image_obj):
     """Perform an initial corse segmentation of the waveform.
@@ -176,7 +178,6 @@ def check_inverted_curve(top_curve_mask, Ymax, Ymin, tol=.25):
     """
     c_rows = np.where(np.sum(top_curve_mask, axis=1))   # Curve rows
     c_range = np.max(c_rows) - np.min(c_rows)           # Y range of top curve
-    #print(c_range / (Ymax - Ymin), tol)
     return c_range / (Ymax - Ymin) < tol
 
 def Segment_refinement(input_image_obj, Xmin, Xmax, Ymin, Ymax):
@@ -426,7 +427,6 @@ def Search_for_ticks(input_image_obj, Side, Left_dimensions, Right_dimensions):
                 [],
                 [],
             )  # Clear/Initialise temporary X Y coordinate stores
-            # print("on target")
             # cv2.drawContours(ROI3, Cs[id], -1,[255], 1)
             onY.append(id)  # record the contour index that meets criteria
             BCs.append(Cs[id])  # ?
@@ -555,7 +555,6 @@ def Search_for_labels(
         number = []
         for i in range(len(extracted_text_data["text"])):
             if extracted_text_data["text"][i] != "":
-                # print(d['text'][i])
                 number.append(extracted_text_data["text"][i])
 
         retry = 0
@@ -568,8 +567,6 @@ def Search_for_labels(
 
         if retry == 0:
             break
-
-    # print(number)
 
     # d = pytesseract.image_to_data(
     #     ROIAX,
@@ -618,7 +615,7 @@ def Search_for_labels(
         dists = cdist([CenBox[i]], CenBox)
         dists[0][i] = dists.max()
         if dists.min() < 20: # detect if characters are too close - but what if they are?
-            print("Characters too close")
+            logger.warning("Characters too close")
 
     try:
         # Find the nearest tick for each number
@@ -631,7 +628,6 @@ def Search_for_labels(
                         (CenBox[txt][0] - CenPoints[tck][0]) ** 2 + (CenBox[txt][1] - CenPoints[tck][1]) ** 2
                     )
                 )  # Distance between current text box and all ticks
-            # print(min(dist))
             MIN = min(dist)  # Find the shortest distance to a tick
             Mindex[txt] = dist.index(
                 MIN
@@ -719,7 +715,7 @@ def Search_for_labels(
             dists = cdist([CenBox[i]], CenBox)
             dists[0][i] = dists.max()
             if dists.min() < 20:
-                print("Characters too close")
+                logger.warning("Characters too close")
 
         Final_CenPoints = CenBox
 
@@ -740,7 +736,6 @@ def Search_for_labels(
                 dist.append(diff)
             elif lst.index(0) == lst.index(i):
                 dist.append(0)
-        # print(dist)
 
         dist_divided = []
         for i in range(0, length):
@@ -760,7 +755,6 @@ def Search_for_labels(
     number = []
     for i in range(len(extracted_text_data["text"])):
         if extracted_text_data["text"][i] != "":
-            # print(extracted_text_data['text'][i])
             number.append(extracted_text_data["text"][i])
 
     empty_to_fill = np.zeros((image.shape[0], image.shape[1]))
@@ -776,9 +770,6 @@ def Search_for_labels(
             int(Right_dimensions[0]) : int(Right_dimensions[1]),
         ] = ROI3  # Left ROI
 
-    # print(number)
-    # print(positions)
-
     return ROIAX, number, positions, empty_to_fill
 
 
@@ -787,29 +778,21 @@ def Plot_Digitized_data(Rticks, Rlocs, Lticks, Llocs, top_curve_coords):
 
     Rticks = list(map(int, Rticks))
     XmaxtickR = max(Rticks)
-    # print("Max tick R:", XmaxtickR)
     XmaxidR = Rticks.index(XmaxtickR)
     XmaxR = Rlocs[XmaxidR][0]
     YmaxR = Rlocs[XmaxidR][1]
-    # print("X max R:", XmaxR)
     XMintickR = min(Rticks)
-    # print("Min tick R:", XMintickR)
     XMinidR = Rticks.index(XMintickR)
     XminR = Rlocs[XMinidR][0]
-    # print("X min R:", XminR)
     #
     Lticks = list(map(int, Lticks))
     XmaxtickL = max(Lticks)
-    # print("Max tick L:", XmaxtickL)
     XmaxidL = Lticks.index(XmaxtickL)
     XmaxL = Llocs[XmaxidL][0]
-    # print("X max L:", XmaxL)
     XMintickL = min(Lticks)
-    # print("Min tick L:", XMintickL)
     XminidL = Lticks.index(XMintickL)
     XminL = Llocs[XminidL][0]
     YminL = Llocs[XminidL][1]
-    # print("X min L:", XminL)
 
     # Yplots = [Llocs[XmaxidL][0], Llocs[XminidL][0], Rlocs[XmaxidR][0]]
     # Xplots = [Llocs[XmaxidL][1], Llocs[XminidL][1], Rlocs[XmaxidR][1]]
@@ -859,7 +842,6 @@ def Plot_Digitized_data(Rticks, Rlocs, Lticks, Llocs, top_curve_coords):
     if np.mean(Yplot) < 0:
         Yplot = [ y * (-1) for y in Yplot]
 
-    # print(Xmin, Xmax)
     plt.figure(2)
     plt.plot(Xplot, Yplot, "-")
     plt.xlabel("Arbitrary time scale")
@@ -936,7 +918,6 @@ def Plot_correction(Xplot, Yplot, df):
         arbitrary_period = (x[peaks[-1]] - x[peaks[1]]) / (len(peaks) - 2)
     except Exception:
         traceback.print_exc()  # prints the error message and traceback
-        pass
 
     try:
         # Period of the signal in real time scale from text extraction
@@ -957,7 +938,7 @@ def Plot_correction(Xplot, Yplot, df):
         plt.xlabel("Time (s)")
         plt.ylabel("Flowrate (cm/s)")
     except Exception:
-        pass
+        traceback.print_exc()
 
     return df
 
@@ -1175,10 +1156,8 @@ def Colour_extract(input_image_obj, TargetRGB, cyl_length, cyl_radius):
             and np.dot(q - pt2, vec) <= 0
             and np.linalg.norm(np.cross(q - pt1, vec)) <= const
         ):
-            # print("is inside")
             logi = 1
         else:
-            # print("not inside")
             logi = 0
 
         return logi
@@ -1270,12 +1249,10 @@ def Text_from_greyscale(input_image_obj, COL):
     data = pytesseract.image_to_data(
         pixels, output_type=Output.DICT, lang="eng", config="--psm 3 "
     )
-    # print(len(data["text"]))
     if (
         len(data["text"]) < 30
     ):  # This is rough, if more than 30 objects found then highly likley it is a waveform scan.
         Fail = 1  # logical, keep scan or not
-        # print("not enough text found - wrong scan type")
     else:
         Fail = 0
 
@@ -1324,9 +1301,6 @@ def Text_from_greyscale(input_image_obj, COL):
 
     tolerance = 3  # Adjust the tolerance value - the max difference between y-coords considered on the same line
     grouped_words = group_similar_numbers(y_center, tolerance, data["text"])
-
-    # for group in grouped_words:
-    #     # print(group)
 
     # Display image
     plt.imshow(img)
@@ -1381,19 +1355,11 @@ def Text_from_greyscale(input_image_obj, COL):
                         ignore_index=True,
                     )
                 else:
-                    print("couldn't find numeric data for line")
+                    logger.warning("couldn't find numeric data for line.")
                     df = df._append(
                         {"Line": i + 1, "Word": word, "Value": 0, "Unit": 0},
                         ignore_index=True,
                     )
-                    pass
-
-    # Print DataFrame
-    # print(input_image_obj)
-    # print(df)
-
-    # # Display the result
-    # cv2.imshow('Result', img)
 
     return Fail, df
 
@@ -1480,10 +1446,7 @@ def Scan_type_test(input_image_filename):
     for target in target_words:
         for word in lines:
             if target in word:
-                # print(f"{target} found in {word}")
                 Fail = 0 # If any of the words are found, then no fail.
-        # Print DataFrame
-    # print(input_image_filename) # Print the file name just processed
 
     return Fail, df  # Return the fail variable and dataframe contraining extracted text.
 
