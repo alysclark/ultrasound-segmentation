@@ -16,21 +16,31 @@ BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 sys.path.append(BASE_DIR)
 from usseg import General_functions
 
+logger = logging.getLogger(__file__)
+
 def data_from_image(PIL_img,cv2_img):
+    """Extract segmentation and textual data from an image.
+
+    Args:
+        PIL_img (Pillow Image object) : The image in Pillow format.
+        cv2_img (cv2 Image object) : The image in cv2 format.
+
+    Returns:
+        df (pandas dataframe) : Dataframe of extracted text.
+        XYdata (list) : X and Y coordinates of the extracted segmentation.
+    """
     Text_data = []  # text data extracted from image
-    Annotated_scans = []
-    Digitized_scans = []
     try:  # Try text extraction
         PIL_image_RGB = PIL_img.convert("RGB")  # We need RGB, so convert here. with PIL
 
         # from General_functions import Colour_extract, Text_from_greyscale
         COL = General_functions.Colour_extract(PIL_image_RGB, [255, 255, 100], 80, 80)
-        print("Done Colour extract")
+        logger.info("Completed colour extraction")
 
         Fail, df = General_functions.Text_from_greyscale(cv2_img, COL)
     except Exception:  # flat fail on 1
         traceback.print_exc()  # prints the error message and traceback
-        print("Failed Text extraction")
+        logger.error("Failed colour or text extraction")
         Text_data.append(None)
         Fail = 0
         pass
@@ -40,7 +50,7 @@ def data_from_image(PIL_img,cv2_img):
             input_image_obj=PIL_image_RGB
         )
     except Exception:  # flat fail on 1
-        print("Failed Initial segmentation")
+        logger.error("Failed Initial segmentation")
         Fail = Fail + 1
         pass
 
@@ -49,14 +59,14 @@ def data_from_image(PIL_img,cv2_img):
             segmentation_mask, Xmin, Xmax, Ymin, Ymax
         )
     except Exception:
-        print("Failed Defining ROI")
+        logger.error("Failed Defining ROI")
         Fail = Fail + 1
         pass
 
     try:
         Waveform_dimensions = [Xmin, Xmax, Ymin, Ymax]
     except Exception:
-        print("Failed Waveform dimensions")
+        logger.error("Failed Waveform dimensions")
         Fail = Fail + 1
         pass
 
@@ -124,7 +134,7 @@ def data_from_image(PIL_img,cv2_img):
         )
     except Exception:
         traceback.print_exc()  # prints the error message and traceback
-        print("Failed Axes search")
+        logger.error("Failed Axes search")
         
         Fail = Fail + 1
         pass
@@ -137,7 +147,7 @@ def data_from_image(PIL_img,cv2_img):
         )
     except Exception:
         traceback.print_exc()  # prints the error message and traceback
-        print("Failed Segment refinement")
+        logger.error("Failed Segment refinement")
         Fail = Fail + 1
         pass
 
@@ -147,7 +157,7 @@ def data_from_image(PIL_img,cv2_img):
         )
 
     except Exception:
-        print("Failed Digitization")
+        logger.error("Failed Digitization")
         traceback.print_exc()
         try:
             Text_data.append(df)
@@ -162,7 +172,7 @@ def data_from_image(PIL_img,cv2_img):
         Text_data.append(df)
     except Exception:
         traceback.print_exc()
-        print("Failed correction")
+        logger.error("Failed correction")
         pass
     to_del = [
         "df",
