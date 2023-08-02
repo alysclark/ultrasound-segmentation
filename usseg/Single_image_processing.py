@@ -18,6 +18,7 @@ from usseg import General_functions
 
 logger = logging.getLogger(__file__)
 
+
 def data_from_image(PIL_img,cv2_img):
     """Extract segmentation and textual data from an image.
 
@@ -29,19 +30,16 @@ def data_from_image(PIL_img,cv2_img):
         df (pandas dataframe) : Dataframe of extracted text.
         XYdata (list) : X and Y coordinates of the extracted segmentation.
     """
-    Text_data = []  # text data extracted from image
-    try:  # Try text extraction
+    try:  
         PIL_image_RGB = PIL_img.convert("RGB")  # We need RGB, so convert here. with PIL
 
-        # from General_functions import Colour_extract, Text_from_greyscale
         COL = General_functions.Colour_extract(PIL_image_RGB, [255, 255, 100], 80, 80)
         logger.info("Completed colour extraction")
 
         Fail, df = General_functions.Text_from_greyscale(cv2_img, COL)
     except Exception:  # flat fail on 1
         traceback.print_exc()  # prints the error message and traceback
-        logger.error("Failed colour or text extraction")
-        Text_data.append(None)
+        logger.error("Failed text extraction")
         Fail = 0
         pass
 
@@ -159,17 +157,11 @@ def data_from_image(PIL_img,cv2_img):
     except Exception:
         logger.error("Failed Digitization")
         traceback.print_exc()
-        try:
-            Text_data.append(df)
-        except Exception:
-            traceback.print_exc()
-            Text_data.append(None)
         Fail = Fail + 1
         pass
 
     try:
         df = General_functions.Plot_correction(Xplot, Yplot, df)
-        Text_data.append(df)
     except Exception:
         traceback.print_exc()
         logger.error("Failed correction")
