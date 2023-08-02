@@ -4,23 +4,12 @@
 
 # Python imports
 import os
-from os import walk
-import logging
 import sys
-import re
-from PIL import Image
-import pickle
+import logging
 
 # Module imports
-import numpy as np
 import matplotlib.pyplot as plt
-import pytesseract
-from pytesseract import Output
-import cv2
 import traceback
-from skimage.measure import label, regionprops
-import openpyxl
-import toml
 
 # Local imports
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
