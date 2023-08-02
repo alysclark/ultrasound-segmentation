@@ -1,6 +1,6 @@
-# /usr/bin/env python3
+#! /usr/bin/env python3
+"""Segments a single ultrasound image object."""
 
-"""Segments a single ultrasound image object"""
 
 # Python imports
 import os
@@ -9,7 +9,6 @@ import logging
 
 # Module imports
 import matplotlib.pyplot as plt
-import traceback
 
 # Local imports
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
@@ -130,5 +129,5 @@ def data_from_image(PIL_img,cv2_img):
         df = General_functions.Plot_correction(Xplot, Yplot, df)
 
     plt.close("all")
-    XYdata = [Xplot,Yplot]
+    XYdata = [Xplot, Yplot]
     return df, XYdata
