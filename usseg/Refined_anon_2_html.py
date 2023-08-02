@@ -4,28 +4,25 @@
 
 # Python imports
 import os
-from os import walk
 import logging
 import sys
-import re
 from PIL import Image
 import pickle
 
 # Module imports
-import numpy as np
 import matplotlib.pyplot as plt
 import pytesseract
-from pytesseract import Output
 import cv2
 import traceback
-from skimage.measure import label, regionprops
-import openpyxl
 import toml
 
 # Import sementation module
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 sys.path.append(BASE_DIR)
 from usseg import General_functions
+
+logger = logging.getLogger(__file__)
+
 
 def setup_tesseract():
     """Checks tesseract is set up appropriately
@@ -101,7 +98,6 @@ def segment(filenames=None, output_dir=None, pickle_path=None):
         for key in subkeys:
             # Access the value corresponding to the key
             filenames = filenames + text_file[key]
-            # print(filenames)
             #
     elif isinstance(filenames, str):
         filenames = [filenames]
@@ -135,12 +131,12 @@ def segment(filenames=None, output_dir=None, pickle_path=None):
 
             # from General_functions import Colour_extract, Text_from_greyscale
             COL = General_functions.Colour_extract(PIL_col, [255, 255, 100], 80, 80)
-            print("Done Colour extract")
+            logger.info("Done Colour extract")
 
             Fail, df = General_functions.Text_from_greyscale(cv2_img, COL)
         except Exception:  # flat fail on 1
             traceback.print_exc()  # prints the error message and traceback
-            print("Failed Text extraction")
+            logger.error("Failed Text extraction")
             Text_data.append(None)
             Fail = 0
             pass
@@ -150,7 +146,7 @@ def segment(filenames=None, output_dir=None, pickle_path=None):
                 input_image_obj=PIL_col
             )
         except Exception:  # flat fail on 1
-            print("Failed Initial segmentation")
+            logger.error("Failed Initial segmentation")
             Fail = Fail + 1
             pass
 
@@ -159,14 +155,14 @@ def segment(filenames=None, output_dir=None, pickle_path=None):
                 segmentation_mask, Xmin, Xmax, Ymin, Ymax
             )
         except Exception:
-            print("Failed Defining ROI")
+            logger.error("Failed Defining ROI")
             Fail = Fail + 1
             pass
 
         try:
             Waveform_dimensions = [Xmin, Xmax, Ymin, Ymax]
         except Exception:
-            print("Failed Waveform dimensions")
+            logger.error("Failed Waveform dimensions")
             Fail = Fail + 1
             pass
 
@@ -234,7 +230,7 @@ def segment(filenames=None, output_dir=None, pickle_path=None):
             )
         except Exception:
             traceback.print_exc()  # prints the error message and traceback
-            print("Failed Axes search")
+            logger.error("Failed Axes search")
             
             Fail = Fail + 1
             pass
@@ -248,7 +244,7 @@ def segment(filenames=None, output_dir=None, pickle_path=None):
                 )
             except Exception:
                 traceback.print_exc()  # prints the error message and traceback
-                print("Failed Segment refinement")
+                logger.error("Failed Segment refinement")
                 Fail = Fail + 1
                 pass
 
@@ -280,7 +276,7 @@ def segment(filenames=None, output_dir=None, pickle_path=None):
                 Text_data.append(df)
             except Exception:
                 traceback.print_exc()
-                print("Failed correction")
+                logger.error("Failed correction")
                 continue
             Digitized_path = output_dir + image_name.partition(".")[0] + "_Digitized.png"
             plt.figure(2)
@@ -288,7 +284,7 @@ def segment(filenames=None, output_dir=None, pickle_path=None):
             Digitized_scans.append(Digitized_path)
 
         except Exception:
-            print("Failed Digitization")
+            logger.error("Failed Digitization")
             Annotated_scans.append(None)
             traceback.print_exc()
             try:
