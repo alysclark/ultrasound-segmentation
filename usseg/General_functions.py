@@ -27,7 +27,7 @@ import re
 import pytesseract
 from pytesseract import Output
 
-def Initial_segmentation(input_image_filename):
+def Initial_segmentation(input_image_obj):
     """Perform an initial corse segmentation of the waveform.
 
     Args:
@@ -40,8 +40,8 @@ def Initial_segmentation(input_image_filename):
         Ymin (float) : Minimum Y coordinate of the segmentation.
         Ymax (float) : Maximum Y coordinate of the segmentation.
     """
-    img_RGBA = Image.open(input_image_filename)  # These images are in RGBA form
-    img_RGB = img_RGBA.convert("RGB")  # We need RGB, so convert here.
+    # img_RGBA = Image.open(input_image_filename)  # These images are in RGBA form
+    img_RGB = input_image_obj
     pixel_data = img_RGB.load()  # Loads a pixel access object, where pixel values can be edited
     # gry = img_RGB.convert("L")  # (returns grayscale version)
 
@@ -114,7 +114,6 @@ def Initial_segmentation(input_image_filename):
 
     return segmentation_mask, Xmin, Xmax, Ymin, Ymax
 
-
 def Define_end_ROIs(segmentation_mask, Xmin, Xmax, Ymin, Ymax):
     """
     Function to define regions adjacent to the corse waveform in which to search for axes info.
@@ -160,7 +159,7 @@ def Define_end_ROIs(segmentation_mask, Xmin, Xmax, Ymin, Ymax):
     Right_dimensions = [Xmin_R, Xmax_R, Ymin_R, Ymax_R]
     return Left_dimensions, Right_dimensions
 
-def check_inverted_curve(top_curve_mask, Ymax, Ymin, tol=.45):
+def check_inverted_curve(top_curve_mask, Ymax, Ymin, tol=.25):
     """Checks to see if top curve mask is of an inverted waveform
 
     Args:
@@ -177,10 +176,10 @@ def check_inverted_curve(top_curve_mask, Ymax, Ymin, tol=.45):
     """
     c_rows = np.where(np.sum(top_curve_mask, axis=1))   # Curve rows
     c_range = np.max(c_rows) - np.min(c_rows)           # Y range of top curve
-    print(c_range / (Ymax - Ymin), tol)
+    #print(c_range / (Ymax - Ymin), tol)
     return c_range / (Ymax - Ymin) < tol
 
-def Segment_refinement(input_image_filename, Xmin, Xmax, Ymin, Ymax):
+def Segment_refinement(input_image_obj, Xmin, Xmax, Ymin, Ymax):
     """
     Function to refine the waveform segmentation within the bounds of the corse waveform ROI.
 
@@ -193,12 +192,13 @@ def Segment_refinement(input_image_filename, Xmin, Xmax, Ymin, Ymax):
     Returns:
         refined_segmentation_mask (ndarray) :  A binary array mask showing the refined segmentation of waveform (1) against background (0).
         top_curve_mask (ndarray) : A binary array showing a curve along the top of the refined waveform.
+    	top_curve_coords (ndarray) : A list of the coordinates for the top curve.
     """
 
     # Refine segmentation to increase smoothing
     # Save output to .txt file to load later.
 
-    image = cv2.imread(input_image_filename)
+    image = input_image_obj
     input_image_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     ret, thresholded_image = cv2.threshold(input_image_gray, 30, 255, 0)
     thresholded_image[:, int(Xmax) : -1] = 0
@@ -263,12 +263,11 @@ def Segment_refinement(input_image_filename, Xmin, Xmax, Ymin, Ymax):
         for x in range(0, int(rp[0].centroid[0])):
             top_curve_mask[x, :] = 0
 
-    o = list(zip(*np.nonzero(top_curve_mask)))
-    np.savetxt("test1.txt", o, fmt="%d")
+    top_curve_coords = np.array(list(zip(*np.nonzero(top_curve_mask))))
 
-    return refined_segmentation_mask, top_curve_mask
+    return refined_segmentation_mask, top_curve_mask, top_curve_coords
 
-def Search_for_ticks(input_image_filename, Side, Left_dimensions, Right_dimensions):
+def Search_for_ticks(input_image_obj, Side, Left_dimensions, Right_dimensions):
     """
     Function to search for the ticks in either of the axes ROIs
 
@@ -293,7 +292,7 @@ def Search_for_ticks(input_image_filename, Side, Left_dimensions, Right_dimensio
         ROI3
     """
 
-    image = cv2.imread(input_image_filename)
+    image = input_image_obj
     thresholded_image = image
 
     if Side == "Left":
@@ -318,7 +317,7 @@ def Search_for_ticks(input_image_filename, Side, Left_dimensions, Right_dimensio
     W = morphology.remove_small_objects(nonzero_pixels, 20, connectivity=2)
     W = W.astype(float)
 
-    im = cv2.imread(input_image_filename)
+    im = input_image_obj
     input_image_gray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
     ret, thresholded_image = cv2.threshold(input_image_gray, 127, 255, 0)
 
@@ -529,12 +528,12 @@ def Search_for_labels(
     Side,
     Left_dimensions,
     Right_dimensions,
-    input_image_filename,
+    input_image_obj,
     ROI2,
     ROI3,
 ):
     for thresh_value in np.arange(100, 190, 5): # Threshold to optimise the resulting text extraction.
-        image = cv2.imread(input_image_filename)
+        image = input_image_obj
         input_image_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         ret, thresholded_image = cv2.threshold(input_image_gray, thresh_value, 255, 0)
         if Side == "Left":
@@ -570,7 +569,7 @@ def Search_for_labels(
         if retry == 0:
             break
 
-    print(number)
+    # print(number)
 
     # d = pytesseract.image_to_data(
     #     ROIAX,
@@ -741,7 +740,7 @@ def Search_for_labels(
                 dist.append(diff)
             elif lst.index(0) == lst.index(i):
                 dist.append(0)
-        print(dist)
+        # print(dist)
 
         dist_divided = []
         for i in range(0, length):
@@ -777,40 +776,40 @@ def Search_for_labels(
             int(Right_dimensions[0]) : int(Right_dimensions[1]),
         ] = ROI3  # Left ROI
 
-    print(number)
-    print(positions)
+    # print(number)
+    # print(positions)
 
     return ROIAX, number, positions, empty_to_fill
 
 
-def Plot_Digitized_data(Rticks, Rlocs, Lticks, Llocs):
+def Plot_Digitized_data(Rticks, Rlocs, Lticks, Llocs, top_curve_coords):
     # Function to digitize the segmetned data:
 
     Rticks = list(map(int, Rticks))
     XmaxtickR = max(Rticks)
-    print("Max tick R:", XmaxtickR)
+    # print("Max tick R:", XmaxtickR)
     XmaxidR = Rticks.index(XmaxtickR)
     XmaxR = Rlocs[XmaxidR][0]
     YmaxR = Rlocs[XmaxidR][1]
-    print("X max R:", XmaxR)
+    # print("X max R:", XmaxR)
     XMintickR = min(Rticks)
-    print("Min tick R:", XMintickR)
+    # print("Min tick R:", XMintickR)
     XMinidR = Rticks.index(XMintickR)
     XminR = Rlocs[XMinidR][0]
-    print("X min R:", XminR)
+    # print("X min R:", XminR)
     #
     Lticks = list(map(int, Lticks))
     XmaxtickL = max(Lticks)
-    print("Max tick L:", XmaxtickL)
+    # print("Max tick L:", XmaxtickL)
     XmaxidL = Lticks.index(XmaxtickL)
     XmaxL = Llocs[XmaxidL][0]
-    print("X max L:", XmaxL)
+    # print("X max L:", XmaxL)
     XMintickL = min(Lticks)
-    print("Min tick L:", XMintickL)
+    # print("Min tick L:", XMintickL)
     XminidL = Lticks.index(XMintickL)
     XminL = Llocs[XminidL][0]
     YminL = Llocs[XminidL][1]
-    print("X min L:", XminL)
+    # print("X min L:", XminL)
 
     # Yplots = [Llocs[XmaxidL][0], Llocs[XminidL][0], Rlocs[XmaxidR][0]]
     # Xplots = [Llocs[XmaxidL][1], Llocs[XminidL][1], Rlocs[XmaxidR][1]]
@@ -820,7 +819,7 @@ def Plot_Digitized_data(Rticks, Rlocs, Lticks, Llocs):
     Ymin = XMintickL
     Ymax = XmaxtickL
 
-    b = np.loadtxt("test1.txt", dtype=float)
+    b = top_curve_coords
     b = sorted(b, key=lambda k: [k[1], k[0]])
 
     b = [B.tolist() for B in b]
@@ -829,8 +828,8 @@ def Plot_Digitized_data(Rticks, Rlocs, Lticks, Llocs):
     b = pd.DataFrame(b).groupby(0, as_index=False)[1].mean().values.tolist()
     b = [x[::-1] for x in b]
 
-    X = [XminL, XmaxR]  # ,231,429,620,820,1011,0]
-    Y = [YminL, YmaxR]  # ,558,554,554,558,566,0]
+    X = [XminL, XmaxR]  
+    Y = [YminL, YmaxR] 
 
     for i in range(0, len(b)):
         if b[i][1] >= XminL + 20 and b[i][1] <= XmaxR - 20:
@@ -843,6 +842,8 @@ def Plot_Digitized_data(Rticks, Rlocs, Lticks, Llocs):
     XmaxScale = topRight[0]
     YminScale = origin[1]
     YmaxScale = topRight[1]
+
+    Ynought = [(0 - YminScale) / (YmaxScale - YminScale) * (Ymax - Ymin) + Ymin]
 
     X = X[2:-1]
     Y = Y[2:-1]
@@ -858,12 +859,12 @@ def Plot_Digitized_data(Rticks, Rlocs, Lticks, Llocs):
     if np.mean(Yplot) < 0:
         Yplot = [ y * (-1) for y in Yplot]
 
-    print(Xmin, Xmax)
+    # print(Xmin, Xmax)
     plt.figure(2)
     plt.plot(Xplot, Yplot, "-")
     plt.xlabel("Arbitrary time scale")
     plt.ylabel("Flowrate (cm/s)")
-    return Xplot, Yplot
+    return Xplot, Yplot, Ynought
 
 
 def Plot_correction(Xplot, Yplot, df):
@@ -962,7 +963,7 @@ def Plot_correction(Xplot, Yplot, df):
 
 
 def Annotate(
-    input_image_filename,
+    input_image_obj,
     refined_segmentation_mask,
     Left_dimensions,
     Right_dimensions,
@@ -991,8 +992,8 @@ def Annotate(
     refined_segmentation_mask[rr, cc] = 2  # set color white
     refined_segmentation_mask[rrL, ccL] = 2
     refined_segmentation_mask[rrR, ccR] = 2
-    img_RGBA = Image.open(input_image_filename)
-    img_RGB = img_RGBA  # .convert('RGB')
+
+    img_RGB = input_image_obj  # .convert('RGB')
     pixel_data = img_RGB.load()
     # gry = img_RGB.convert("L")  # returns grayscale version.
 
@@ -1024,7 +1025,7 @@ def Annotate(
     return img_RGB
 
 
-def Colour_extract(input_image_filename, vals):
+def Colour_extract(input_image_obj, TargetRGB, cyl_length, cyl_radius):
     """Function for extracing target colours from image
 
     Args:
@@ -1034,8 +1035,8 @@ def Colour_extract(input_image_filename, vals):
     Returns:
         COL (JpegImageFile) : PIL JpegImageFile of the filtered image highlighting yellow text.
     """
-    img = np.array(Image.open(input_image_filename).convert('RGB'))
-    img_rtn = np.zeros((img.shape[0], img.shape[1]))
+    col4 = input_image_obj
+    pix4 = col4.load()
 
     img_rtn[np.where(
         (img[:, :, 0] >= vals[0][0]) &
@@ -1046,11 +1047,204 @@ def Colour_extract(input_image_filename, vals):
         (img[:, :, 2] <= vals[2][1])
     )] = 255
 
-    COL = Image.fromarray((np.zeros(img.shape) + img_rtn[:, :, None]).astype('uint8'), 'RGB')
+    def appendSpherical_1point(xyz):
+        ptsnew = np.hstack(
+            (xyz, np.zeros(xyz.shape), np.zeros(xyz.shape), np.zeros(xyz.shape))
+        )
+        xy = xyz[0] ** 2 + xyz[1] ** 2
+
+        ptsnew[3] = np.sqrt(xy)  # xy length
+        ptsnew[4] = np.sqrt(xy + xyz[2] ** 2)  # magnitude of vector (radius)
+        # angles:
+        ptsnew[5] = np.arctan(np.divide(ptsnew[1], ptsnew[0])) * (180 / math.pi)  # theta
+        ptsnew[6] = np.arcsin(np.divide(ptsnew[2], ptsnew[4])) * (180 / math.pi)  # alpha
+
+        return ptsnew
+
+    targ = np.array(TargetRGB)
+    out2 = appendSpherical_1point(targ)
+
+    H2 = cyl_length  # This is our Hypotenuse
+    O2 = math.sin(math.radians(out2[6])) * H2  # Opposite length 2
+    A2 = math.cos(math.radians(out2[6])) * H2  # Adjecent length 2 == Hypotenuse1
+    O1 = math.sin(math.radians(out2[5])) * A2
+    A1 = math.cos(math.radians(out2[5])) * A2
+
+    R2 = out2[0] + A1
+    G2 = out2[1] + O1
+    B2 = out2[2] + O2
+
+    R1 = out2[0] - A1
+    G1 = out2[1] - O1
+    B1 = out2[2] - O2
+
+    Ctemp = np.array([out2[0], out2[1], out2[2]])
+    ## Visualise target pixel in the RGB space
+    # fig = plt.figure(1)
+    # ax = fig.add_subplot(111, projection='3d')
+    # # ax.scatter(R1,G1,B1,color="black")
+    # # ax.scatter(R2,G2,B2,color="black")
+    # ax.scatter(out2[0],out2[1],out2[2],c = Ctemp/255)
+    # ax.plot([0,0],[0,0],[0,250], color="blue")
+    # ax.plot([0,250],[0,0],[0,0], color="red")
+    # ax.plot([0,0],[0,250],[0,0], color="green")
+    # ax.plot([0,out2[0]],[0,out2[1]],[0,0], color="black")
+    # ax.plot([0,out2[0]],[0,out2[1]],[0,out2[2]], color="black")
+    # ax.plot([out2[0],out2[0]],[out2[1],out2[1]],[0,out2[2]], color="black")
+    # ax.plot([out2[0],out2[0]],[0,out2[1]],[0,0], color="black")
+    # ax.plot([0,out2[0]],[0,0],[0,0], color="black")
+    # ax.set_xlabel('Red x')
+    # ax.set_ylabel('Green y')
+    # ax.set_zlabel('Blue z')
+    # ax.xaxis.label.set_color('red')
+    # ax.tick_params(axis='x', colors='red')
+    # ax.yaxis.label.set_color('green')
+    # ax.tick_params(axis='y', colors='green')
+    # ax.zaxis.label.set_color('blue')
+    # ax.tick_params(axis='z', colors='blue')
+    # ax.view_init(20, -45)
+    #plt.show()
+
+    ## CYLINDER STUFF
+    # defining mask
+    shape = (260, 260, 260)
+    image = np.zeros(shape=shape)
+
+    # set radius and centres values
+    r = 100
+    start = [R1, G1, B1]
+    end = [R2, G2, B2]
+    p1 = np.array(start)
+    p2 = np.array(end)
+
+    # vector in direction of axis
+    v = p2 - p1
+    # find magnitude of vector
+    mag = scipy.linalg.norm(v)
+    # unit vector in direction of axis
+    v = v / mag
+    # make some vector not in the same direction as v
+    not_v = np.array([1, 0, 0])
+    if (v == not_v).all():
+        not_v = np.array([0, 1, 0])
+    # make vector perpendicular to v
+    n1 = np.cross(v, not_v)
+    # normalize n1
+    n1 /= scipy.linalg.norm(n1)
+    # make unit vector perpendicular to v and n1
+    n2 = np.cross(v, n1)
+    # surface ranges over t from 0 to length of axis and 0 to 2*pi
+    t = np.linspace(0, mag, 20)
+    theta = np.linspace(0, 2 * np.pi, 20)
+    rsample = np.linspace(0, r, 2)
+
+    # use meshgrid to make 2d arrays
+    t, theta2 = np.meshgrid(t, theta)
+    rsample, theta = np.meshgrid(rsample, theta)
+
+    # generate coordinates for surface
+    # "Tube"
+    X, Y, Z = [
+        p1[i] + v[i] * t + r * np.sin(theta2) * n1[i] + r * np.cos(theta2) * n2[i]
+        for i in [0, 1, 2]
+    ]
+    # "Bottom"
+    X2, Y2, Z2 = [
+        p1[i] + rsample[i] * np.sin(theta) * n1[i] + rsample[i] * np.cos(theta) * n2[i]
+        for i in [0, 1, 2]
+    ]
+    # "Top"
+    X3, Y3, Z3 = [
+        p1[i]
+        + v[i] * mag
+        + rsample[i] * np.sin(theta) * n1[i]
+        + rsample[i] * np.cos(theta) * n2[i]
+        for i in [0, 1, 2]
+    ]
+
+    # ax.plot_surface(X, Y, Z,alpha=.2)
+    # ax.plot_surface(X2, Y2, Z2,alpha=.2)
+    # ax.plot_surface(X3, Y3, Z3,alpha=.2)
+    def points_in_cylinder(pt1, pt2, r, q):
+        pt1 = np.array(pt1)
+        pt2 = np.array(pt2)
+        vec = pt2 - pt1
+        const = r * np.linalg.norm(vec)
+
+        if (
+            np.dot(q - pt1, vec) >= 0
+            and np.dot(q - pt2, vec) <= 0
+            and np.linalg.norm(np.cross(q - pt1, vec)) <= const
+        ):
+            # print("is inside")
+            logi = 1
+        else:
+            # print("not inside")
+            logi = 0
+
+        return logi
+
+    col4 = input_image_obj
+    pix4 = col4.load()
+    gry4 = col4.convert("L")  # returns grayscale version.
+
+    Rmat = []
+    Gmat = []
+    Bmat = []
+    Xs = []
+    Ys = []
+    C = []
+    alpha = []
+    beta = []
+    gamma = []
+
+    for y in range(col4.size[1]):
+        for x in range(col4.size[0]):
+            Rmat.append(pix4[x, y][0])
+            Gmat.append(pix4[x, y][1])
+            Bmat.append(pix4[x, y][2])
+            Xs.append(x)
+            Ys.append(y)
+            C.append([pix4[x, y][0], pix4[x, y][1], pix4[x, y][2]])
+
+    C = np.array(C)
+
+    logi = []
+    for i in range(len(Rmat)):
+        logi.append(
+            points_in_cylinder(start, end, r, np.array([Rmat[i], Gmat[i], Bmat[i]]))
+        )
+
+    ids = np.where(np.array(logi) == 1)
+    Rmat = np.array(Rmat)
+    Gmat = np.array(Gmat)
+    Bmat = np.array(Bmat)
+    Xs = np.array(Xs)
+    Ys = np.array(Ys)
+    #ax.scatter(Rmat[ids],Gmat[ids],Bmat[ids],c = C[ids]/255) # plot the select points in RGB coords
+    #ax.scatter(Rmat,Gmat,Bmat,c = C/255)
+    #plt.show()
+
+    ## COMBINE
+    COL = input_image_obj
+    COL = COL.convert("RGB")  # We need RGB, so convert here.
+    PIX = COL.load()
+
+    for id in ids[0]:
+        PIX[Xs[id], Ys[id]] = (255, 255, 255)  # (Rmat[id],Gmat[id],Bmat[id])
+
+    for y in range(COL.size[1]):
+        for x in range(COL.size[0]):
+            if PIX[x, y] != (255, 255, 255):
+                PIX[x, y] = (0, 0, 0)
+
+    # plt.figure(2)
+    # plt.imshow(COL)
+    # plt.show()
     return COL
 
 
-def Text_from_greyscale(input_image_filename, COL):
+def Text_from_greyscale(input_image_obj, COL):
     """
     Function for extracting text from the yellow filtered image.
 
@@ -1065,7 +1259,7 @@ def Text_from_greyscale(input_image_filename, COL):
     """
 
     PIX = COL.load()
-    img = cv2.imread(input_image_filename)
+    img = input_image_obj
     for y in range(
         int(COL.size[1] * 0.45), COL.size[1]
     ):  # Exclude bottom 3rd of image - these are fails
@@ -1077,7 +1271,7 @@ def Text_from_greyscale(input_image_filename, COL):
     data = pytesseract.image_to_data(
         pixels, output_type=Output.DICT, lang="eng", config="--psm 3 "
     )
-    print(len(data["text"]))
+    # print(len(data["text"]))
     if (
         len(data["text"]) < 30
     ):  # This is rough, if more than 30 objects found then highly likley it is a waveform scan.
@@ -1132,8 +1326,8 @@ def Text_from_greyscale(input_image_filename, COL):
     tolerance = 3  # Adjust the tolerance value - the max difference between y-coords considered on the same line
     grouped_words = group_similar_numbers(y_center, tolerance, data["text"])
 
-    for group in grouped_words:
-        print(group)
+    # for group in grouped_words:
+    #     # print(group)
 
     # Display image
     plt.imshow(img)
@@ -1189,15 +1383,15 @@ def Text_from_greyscale(input_image_filename, COL):
                     )
                 else:
                     print("couldn't find numeric data for line")
-                    df = df.append(
+                    df = df._append(
                         {"Line": i + 1, "Word": word, "Value": 0, "Unit": 0},
                         ignore_index=True,
                     )
                     pass
 
     # Print DataFrame
-    print(input_image_filename)
-    print(df)
+    # print(input_image_obj)
+    # print(df)
 
     # # Display the result
     # cv2.imshow('Result', img)
@@ -1287,10 +1481,10 @@ def Scan_type_test(input_image_filename):
     for target in target_words:
         for word in lines:
             if target in word:
-                print(f"{target} found in {word}")
+                # print(f"{target} found in {word}")
                 Fail = 0 # If any of the words are found, then no fail.
         # Print DataFrame
-    print(input_image_filename) # Print the file name just processed
+    # print(input_image_filename) # Print the file name just processed
 
     return Fail, df  # Return the fail variable and dataframe contraining extracted text.
 
