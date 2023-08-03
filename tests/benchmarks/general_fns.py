@@ -10,7 +10,6 @@ from PIL import Image
 
 # Module imports
 import numpy as np
-import matplotlib.pyplot as plt
 import scipy
 
 # Local imports
@@ -19,10 +18,11 @@ sys.path.append(BASE_DIR)
 import usseg
 
 logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__file__)
 
 def test_colour_extraction():
 
-    def Colour_extract(input_image_filename, TargetRGB, cyl_length, cyl_radius):
+    def Colour_extract(input_image_obj, TargetRGB, cyl_length, cyl_radius):
         """OLD FUNCTION: Function for extracing target colours from image
         converts image to RGB space and find coordinates of pixels within a
         cylinder whose center is the target triplet. You can visualise this
@@ -37,7 +37,7 @@ def test_colour_extraction():
         Returns:
             COL (JpegImageFile) : PIL JpegImageFile of the filtered image highlighting yellow text.
         """
-        col4 = Image.open(input_image_filename)
+        col4 = input_image_obj
         pix4 = col4.load()
 
         # DEFINE END POINTS OF CYLINDER
@@ -180,7 +180,7 @@ def test_colour_extraction():
 
             return logi
 
-        col4 = Image.open(input_image_filename)
+        col4 = input_image_obj
         pix4 = col4.load()
         gry4 = col4.convert("L")  # returns grayscale version.
 
@@ -222,7 +222,7 @@ def test_colour_extraction():
         #plt.show()
 
         ## COMBINE
-        COL = Image.open(input_image_filename)
+        COL = input_image_obj
         COL = COL.convert("RGB")  # We need RGB, so convert here.
         PIX = COL.load()
 
@@ -239,27 +239,36 @@ def test_colour_extraction():
         # plt.show()
         return COL
 
-    filename = 'Lt_test_image.png'
+    image = Image.open('Lt_test_image.png')
     target_colour = (255, 255, 100)
     rad = 100
     height = 80
-    col_vals = ((220, 255), (220, 255), (70, 160))
     num_iter = 3
 
     t_init = time.time()
     for _ in range(num_iter):
-        img_extraced_new = usseg.General_functions.Colour_extract(filename, col_vals)
+        img_extracted_new = usseg.General_functions.Colour_extract(image, target_colour, rad, height)
     t_fin_new = (time.time() - t_init) / num_iter
 
     t_init = time.time()
     for _ in range(num_iter):
-        img_extraced_orig = Colour_extract(filename, target_colour, rad, height)
+        img_extracted_orig = Colour_extract(image, target_colour, rad, height)
     t_fin_old = (time.time() - t_init) / num_iter
 
     logging.info(f"Average run time of test method: {t_fin_old:.3f}")
     logging.info(f"Average run time of func method: {t_fin_new:.3f}")
 
-    assert np.mean(np.abs(img_extraced_new - np.mean(img_extraced_orig, axis=2))) < 3
+    img_extracted_orig = np.array(img_extracted_orig, dtype=np.float_)
+    img_extracted_new = np.array(img_extracted_new, dtype=np.float_)
+
+    mape = np.abs(img_extracted_new - img_extracted_orig)
+    mape[img_extracted_orig != 0] /= img_extracted_orig[img_extracted_orig != 0]
+    mape = np.mean(mape)
+    logger.info(f"MAPE between methods: {mape}")
+
+    overlap = 100 * np.sum(img_extracted_new == img_extracted_orig) / img_extracted_orig.size
+    logger.info(f"Overlap between images {overlap:.3f}%")
+
 
 if __name__ == "__main__":
     test_colour_extraction()

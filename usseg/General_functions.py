@@ -1,13 +1,16 @@
 """ A set of functions to segment and extract data from doppler ultrasound scans"""
 
+# Python imports
+from functools import lru_cache
+
 # Module imports
-from PIL import Image
 import matplotlib.pyplot as plt
 from skimage import morphology, measure
 import numpy as np
 from skimage.measure import find_contours
 from skimage.draw import polygon_perimeter
 import cv2
+from PIL import Image
 import scipy
 import traceback
 from scipy.ndimage.filters import gaussian_filter
@@ -26,6 +29,21 @@ import pandas as pd
 import re
 import pytesseract
 from pytesseract import Output
+
+
+class _HashableArray(np.ndarray):
+    def __new__(self, *args, **kwargs):
+        obj = np.asarray(*args, **kwargs).view(self)
+        return obj
+
+    def __eq__(self, other):
+        return hash(self) == hash(other)
+
+    def __hash__(self):
+        if self.size > 1:
+            return hash(tuple(self.view()))
+        return hash(self.view().item)
+
 
 def Initial_segmentation(input_image_obj):
     """Perform an initial corse segmentation of the waveform.
@@ -1025,223 +1043,51 @@ def Annotate(
     return img_RGB
 
 
+@lru_cache(maxsize=16384)
+def _in_cylinder(coord, bot, top, center, const):
+    coord = np.array(coord).reshape(1, 3)
+    above_bot = np.dot(coord - bot, center) >= 0
+    below_top = np.dot(coord - top, center) <= 0
+    within_rad = np.linalg.norm(np.cross(coord - bot, center.T)) <= const
+    return (above_bot and below_top and within_rad).item()
+
+
 def Colour_extract(input_image_obj, TargetRGB, cyl_length, cyl_radius):
-    """Function for extracing target colours from image
+    """Extract target colours from image.
 
     Args:
-        input_image_filename (str) : Name of file within current directory, or path to a file.
-        vals (tuple) : Tuple pairs of min and max values for each R, G, B.
+        input_image_obj (PIL Image) : PIL Image object.
+        TargetRGB (list) : triplet of target Red Green Blue colour [Red,Green,Blue].
+        cyl_length (int) : length of cylinder.
+        cyl_radius (int) : radius of cylinder.
 
     Returns:
-        COL (JpegImageFile) : PIL JpegImageFile of the filtered image highlighting yellow text.
+        COL (JpegImageFile) : PIL JpegImageFile of the filtered image highlighting selected text.
     """
-    col4 = input_image_obj
-    pix4 = col4.load()
+    img = np.array(input_image_obj)[:, :, :3] # Ignores alpha channel
+    center = np.array(TargetRGB).reshape(3, 1)
+    lb = [max(0, c - np.sqrt((cyl_length / 2) ** 2 + cyl_radius ** 2)) for c in center]
+    ub = [min(255, c + np.sqrt((cyl_length / 2) ** 2 + cyl_radius ** 2)) for c in center]
 
-    img_rtn[np.where(
-        (img[:, :, 0] >= vals[0][0]) &
-        (img[:, :, 0] <= vals[0][1]) &
-        (img[:, :, 1] >= vals[1][0]) &
-        (img[:, :, 1] <= vals[1][1]) &
-        (img[:, :, 2] >= vals[2][0]) &
-        (img[:, :, 2] <= vals[2][1])
-    )] = 255
+    mask = np.zeros((img.shape[0], img.shape[1]))
+    for i, colour in enumerate(TargetRGB):
+        in_colour_box = np.logical_and(img[:, :, i] >= lb[i], img[:, :, i] <= ub[i])
+        mask += in_colour_box
+    scoords_y, scoords_x = np.where(mask == 3)  # Defines search coordinates
 
-    def appendSpherical_1point(xyz):
-        ptsnew = np.hstack(
-            (xyz, np.zeros(xyz.shape), np.zeros(xyz.shape), np.zeros(xyz.shape))
-        )
-        xy = xyz[0] ** 2 + xyz[1] ** 2
+    top = _HashableArray((center + center / 2).reshape(1, 3))
+    bot = _HashableArray((center - center / 2).reshape(1, 3))
+    const = _HashableArray(cyl_radius * np.linalg.norm(center))
+    center = _HashableArray(center)
+    cic = np.zeros_like(scoords_x, dtype=np.bool_)  # Coords In Cylinder
+    for i in range(scoords_x.size):
+        pix = _HashableArray(img[scoords_y[i], scoords_x[i], :])
+        cic[i] = _in_cylinder(pix, bot, top, center, const)
 
-        ptsnew[3] = np.sqrt(xy)  # xy length
-        ptsnew[4] = np.sqrt(xy + xyz[2] ** 2)  # magnitude of vector (radius)
-        # angles:
-        ptsnew[5] = np.arctan(np.divide(ptsnew[1], ptsnew[0])) * (180 / math.pi)  # theta
-        ptsnew[6] = np.arcsin(np.divide(ptsnew[2], ptsnew[4])) * (180 / math.pi)  # alpha
+    col_extract = np.zeros_like(img)
+    col_extract[scoords_y[cic], scoords_x[cic], :] = [255, 255, 255]
 
-        return ptsnew
-
-    targ = np.array(TargetRGB)
-    out2 = appendSpherical_1point(targ)
-
-    H2 = cyl_length  # This is our Hypotenuse
-    O2 = math.sin(math.radians(out2[6])) * H2  # Opposite length 2
-    A2 = math.cos(math.radians(out2[6])) * H2  # Adjecent length 2 == Hypotenuse1
-    O1 = math.sin(math.radians(out2[5])) * A2
-    A1 = math.cos(math.radians(out2[5])) * A2
-
-    R2 = out2[0] + A1
-    G2 = out2[1] + O1
-    B2 = out2[2] + O2
-
-    R1 = out2[0] - A1
-    G1 = out2[1] - O1
-    B1 = out2[2] - O2
-
-    Ctemp = np.array([out2[0], out2[1], out2[2]])
-    ## Visualise target pixel in the RGB space
-    # fig = plt.figure(1)
-    # ax = fig.add_subplot(111, projection='3d')
-    # # ax.scatter(R1,G1,B1,color="black")
-    # # ax.scatter(R2,G2,B2,color="black")
-    # ax.scatter(out2[0],out2[1],out2[2],c = Ctemp/255)
-    # ax.plot([0,0],[0,0],[0,250], color="blue")
-    # ax.plot([0,250],[0,0],[0,0], color="red")
-    # ax.plot([0,0],[0,250],[0,0], color="green")
-    # ax.plot([0,out2[0]],[0,out2[1]],[0,0], color="black")
-    # ax.plot([0,out2[0]],[0,out2[1]],[0,out2[2]], color="black")
-    # ax.plot([out2[0],out2[0]],[out2[1],out2[1]],[0,out2[2]], color="black")
-    # ax.plot([out2[0],out2[0]],[0,out2[1]],[0,0], color="black")
-    # ax.plot([0,out2[0]],[0,0],[0,0], color="black")
-    # ax.set_xlabel('Red x')
-    # ax.set_ylabel('Green y')
-    # ax.set_zlabel('Blue z')
-    # ax.xaxis.label.set_color('red')
-    # ax.tick_params(axis='x', colors='red')
-    # ax.yaxis.label.set_color('green')
-    # ax.tick_params(axis='y', colors='green')
-    # ax.zaxis.label.set_color('blue')
-    # ax.tick_params(axis='z', colors='blue')
-    # ax.view_init(20, -45)
-    #plt.show()
-
-    ## CYLINDER STUFF
-    # defining mask
-    shape = (260, 260, 260)
-    image = np.zeros(shape=shape)
-
-    # set radius and centres values
-    r = 100
-    start = [R1, G1, B1]
-    end = [R2, G2, B2]
-    p1 = np.array(start)
-    p2 = np.array(end)
-
-    # vector in direction of axis
-    v = p2 - p1
-    # find magnitude of vector
-    mag = scipy.linalg.norm(v)
-    # unit vector in direction of axis
-    v = v / mag
-    # make some vector not in the same direction as v
-    not_v = np.array([1, 0, 0])
-    if (v == not_v).all():
-        not_v = np.array([0, 1, 0])
-    # make vector perpendicular to v
-    n1 = np.cross(v, not_v)
-    # normalize n1
-    n1 /= scipy.linalg.norm(n1)
-    # make unit vector perpendicular to v and n1
-    n2 = np.cross(v, n1)
-    # surface ranges over t from 0 to length of axis and 0 to 2*pi
-    t = np.linspace(0, mag, 20)
-    theta = np.linspace(0, 2 * np.pi, 20)
-    rsample = np.linspace(0, r, 2)
-
-    # use meshgrid to make 2d arrays
-    t, theta2 = np.meshgrid(t, theta)
-    rsample, theta = np.meshgrid(rsample, theta)
-
-    # generate coordinates for surface
-    # "Tube"
-    X, Y, Z = [
-        p1[i] + v[i] * t + r * np.sin(theta2) * n1[i] + r * np.cos(theta2) * n2[i]
-        for i in [0, 1, 2]
-    ]
-    # "Bottom"
-    X2, Y2, Z2 = [
-        p1[i] + rsample[i] * np.sin(theta) * n1[i] + rsample[i] * np.cos(theta) * n2[i]
-        for i in [0, 1, 2]
-    ]
-    # "Top"
-    X3, Y3, Z3 = [
-        p1[i]
-        + v[i] * mag
-        + rsample[i] * np.sin(theta) * n1[i]
-        + rsample[i] * np.cos(theta) * n2[i]
-        for i in [0, 1, 2]
-    ]
-
-    # ax.plot_surface(X, Y, Z,alpha=.2)
-    # ax.plot_surface(X2, Y2, Z2,alpha=.2)
-    # ax.plot_surface(X3, Y3, Z3,alpha=.2)
-    def points_in_cylinder(pt1, pt2, r, q):
-        pt1 = np.array(pt1)
-        pt2 = np.array(pt2)
-        vec = pt2 - pt1
-        const = r * np.linalg.norm(vec)
-
-        if (
-            np.dot(q - pt1, vec) >= 0
-            and np.dot(q - pt2, vec) <= 0
-            and np.linalg.norm(np.cross(q - pt1, vec)) <= const
-        ):
-            # print("is inside")
-            logi = 1
-        else:
-            # print("not inside")
-            logi = 0
-
-        return logi
-
-    col4 = input_image_obj
-    pix4 = col4.load()
-    gry4 = col4.convert("L")  # returns grayscale version.
-
-    Rmat = []
-    Gmat = []
-    Bmat = []
-    Xs = []
-    Ys = []
-    C = []
-    alpha = []
-    beta = []
-    gamma = []
-
-    for y in range(col4.size[1]):
-        for x in range(col4.size[0]):
-            Rmat.append(pix4[x, y][0])
-            Gmat.append(pix4[x, y][1])
-            Bmat.append(pix4[x, y][2])
-            Xs.append(x)
-            Ys.append(y)
-            C.append([pix4[x, y][0], pix4[x, y][1], pix4[x, y][2]])
-
-    C = np.array(C)
-
-    logi = []
-    for i in range(len(Rmat)):
-        logi.append(
-            points_in_cylinder(start, end, r, np.array([Rmat[i], Gmat[i], Bmat[i]]))
-        )
-
-    ids = np.where(np.array(logi) == 1)
-    Rmat = np.array(Rmat)
-    Gmat = np.array(Gmat)
-    Bmat = np.array(Bmat)
-    Xs = np.array(Xs)
-    Ys = np.array(Ys)
-    #ax.scatter(Rmat[ids],Gmat[ids],Bmat[ids],c = C[ids]/255) # plot the select points in RGB coords
-    #ax.scatter(Rmat,Gmat,Bmat,c = C/255)
-    #plt.show()
-
-    ## COMBINE
-    COL = input_image_obj
-    COL = COL.convert("RGB")  # We need RGB, so convert here.
-    PIX = COL.load()
-
-    for id in ids[0]:
-        PIX[Xs[id], Ys[id]] = (255, 255, 255)  # (Rmat[id],Gmat[id],Bmat[id])
-
-    for y in range(COL.size[1]):
-        for x in range(COL.size[0]):
-            if PIX[x, y] != (255, 255, 255):
-                PIX[x, y] = (0, 0, 0)
-
-    # plt.figure(2)
-    # plt.imshow(COL)
-    # plt.show()
-    return COL
+    return Image.fromarray(col_extract)
 
 
 def Text_from_greyscale(input_image_obj, COL):
