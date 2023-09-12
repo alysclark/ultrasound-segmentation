@@ -86,9 +86,12 @@ def segment(filenames=None, output_dir=None, pickle_path=None):
     elif isinstance(filenames, list):
         pass
 
-    elif filenames.endswith(".pkl") or filenames.endswith(".pickle"):
-        with open(filenames, "rb") as f:
-            text_file = pickle.load(f)
+    elif isinstance(filenames, dict) or filenames.endswith(".pkl") or filenames.endswith(".pickle"):
+        if isinstance(filenames, str):
+            with open(filenames, "rb") as f:
+                text_file = pickle.load(f)
+        else:
+            text_file = filenames
 
         # Get a list of all the keys in the dictionary
         subkeys = list(text_file.keys())
