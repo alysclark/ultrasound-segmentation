@@ -20,37 +20,6 @@ import usseg
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__file__)
 
-def proposed_colour_extraction(img, rgb_vec, length, radius):
-    """Extract colour from an image"""
-
-    # Finds the minimum and maximum magnitudes for the colour vector
-    img = np.array(img)[:, :, :3].astype(float)
-    rgb_vec = np.array(rgb_vec)
-    mag = np.sqrt(np.sum(rgb_vec ** 2))
-    img_dot = np.zeros_like(img[:, :, 0])
-    for channel, val in enumerate(rgb_vec):
-        img_dot += img[:, :, channel] * val
-    img_dot /= mag
-
-    min_mag = mag - length / 2
-    max_mag = mag + length / 2
-
-    # Finds the distance of the colours to the cylinder axis
-    img_cross = np.zeros_like(img_dot)
-    for channel, val in enumerate(rgb_vec):
-        c1 = channel + 1 if channel + 1 < len(rgb_vec) else channel + 1 - len(rgb_vec)
-        c2 = channel + 2 if channel + 2 < len(rgb_vec) else channel + 2 - len(rgb_vec)
-        img_cross += (rgb_vec[c1] * img[:, :, c2] - rgb_vec[c2] * img[:, :, c1]) ** 2
-    distance_to_axis = np.sqrt(img_cross) / mag
-    
-    mask = np.logical_and(
-        np.logical_and(img_dot <= max_mag, img_dot >= min_mag),
-        distance_to_axis <= radius,
-    ).astype(np.uint8) * 255
-
-
-    return Image.fromarray(mask)
-    
 def test_colour_extraction():
 
     def Colour_extract(input_image_obj, TargetRGB, cyl_length, cyl_radius):
@@ -276,38 +245,28 @@ def test_colour_extraction():
     height = 80
     num_iter = 3
 
-    t_prop = time.time()
-    for _ in range(num_iter):
-        img_extracted_prop = proposed_colour_extraction(image, target_colour, height, rad)
-    t_fin_prop = (time.time() - t_prop) / num_iter
-    img_extracted_prop.save("prop.png")
-
     t_init = time.time()
     for _ in range(num_iter):
         img_extracted_new = usseg.General_functions.Colour_extract(image, target_colour, rad, height)
     t_fin_new = (time.time() - t_init) / num_iter
-    img_extracted_new.save("new.png")
 
     t_init = time.time()
     for _ in range(num_iter):
         img_extracted_orig = Colour_extract(image, target_colour, rad, height)
     t_fin_old = (time.time() - t_init) / num_iter
-    img_extracted_orig.save("orig.png")
 
     logging.info(f"Average run time of test method: {t_fin_old:.3f}")
     logging.info(f"Average run time of func method: {t_fin_new:.3f}")
-    logging.info(f"Average run time of prop method: {t_fin_prop:.3f}")
 
     img_extracted_orig = np.array(img_extracted_orig, dtype=np.float_)
     img_extracted_new = np.array(img_extracted_new, dtype=np.float_)
-    img_extracted_prop = np.array(img_extracted_prop, dtype=np.float_)
 
-    mape = np.abs(img_extracted_new - img_extracted_orig)
+    mape = np.abs(img_extracted_new[:, :, None] - img_extracted_orig)
     mape[img_extracted_orig != 0] /= img_extracted_orig[img_extracted_orig != 0]
     mape = np.mean(mape)
     logger.info(f"MAPE between methods: {mape}")
 
-    overlap = 100 * np.sum(img_extracted_new == img_extracted_orig) / img_extracted_orig.size
+    overlap = 100 * np.sum(img_extracted_new[:, :, None] == img_extracted_orig) / img_extracted_orig.size
     logger.info(f"Overlap between images {overlap:.3f}%")
 
 
