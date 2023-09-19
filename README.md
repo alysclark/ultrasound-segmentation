@@ -41,6 +41,7 @@ To install the development environment follow the following steps.
 - Clone this repository and change into the directory.
 - Install [poetry](https://python-poetry.org/docs/) as per the installation instructions.
 - Install [tesseract](https://github.com/tesseract-ocr/tesseract) as per the intallation instructions.
+    - Note that the project has only been tested with tesseract version 5.
 - Install the package dependencies with:
 ```
 poetry install
