@@ -261,12 +261,12 @@ def test_colour_extraction():
     img_extracted_orig = np.array(img_extracted_orig, dtype=np.float_)
     img_extracted_new = np.array(img_extracted_new, dtype=np.float_)
 
-    mape = np.abs(img_extracted_new - img_extracted_orig)
+    mape = np.abs(img_extracted_new[:, :, None] - img_extracted_orig)
     mape[img_extracted_orig != 0] /= img_extracted_orig[img_extracted_orig != 0]
     mape = np.mean(mape)
     logger.info(f"MAPE between methods: {mape}")
 
-    overlap = 100 * np.sum(img_extracted_new == img_extracted_orig) / img_extracted_orig.size
+    overlap = 100 * np.sum(img_extracted_new[:, :, None] == img_extracted_orig) / img_extracted_orig.size
     logger.info(f"Overlap between images {overlap:.3f}%")
 
 

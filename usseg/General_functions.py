@@ -1042,31 +1042,35 @@ def Colour_extract(input_image_obj, TargetRGB, cyl_length, cyl_radius):
     Returns:
         COL (JpegImageFile) : PIL JpegImageFile of the filtered image highlighting selected text.
     """
-    img = np.array(input_image_obj)[:, :, :3] # Ignores alpha channel
-    center = np.array(TargetRGB).reshape(3, 1)
-    lb = [max(0, c - np.sqrt((cyl_length / 2) ** 2 + cyl_radius ** 2)) for c in center]
-    ub = [min(255, c + np.sqrt((cyl_length / 2) ** 2 + cyl_radius ** 2)) for c in center]
 
-    mask = np.zeros((img.shape[0], img.shape[1]))
-    for i, colour in enumerate(TargetRGB):
-        in_colour_box = np.logical_and(img[:, :, i] >= lb[i], img[:, :, i] <= ub[i])
-        mask += in_colour_box
-    scoords_y, scoords_x = np.where(mask == 3)  # Defines search coordinates
+    # Finds the minimum and maximum magnitudes for the colour vector
+    img = np.array(input_image_obj)[:, :, :3].astype(float)
+    rgb_vec = np.array(TargetRGB)
+    mag = np.sqrt(np.sum(rgb_vec ** 2))
+    img_dot = np.zeros_like(img[:, :, 0])
 
-    top = _HashableArray((center + center / 2).reshape(1, 3))
-    bot = _HashableArray((center - center / 2).reshape(1, 3))
-    const = _HashableArray(cyl_radius * np.linalg.norm(center))
-    center = _HashableArray(center)
-    cic = np.zeros_like(scoords_x, dtype=np.bool_)  # Coords In Cylinder
-    for i in range(scoords_x.size):
-        pix = _HashableArray(img[scoords_y[i], scoords_x[i], :])
-        cic[i] = _in_cylinder(pix, bot, top, center, const)
+    for channel, val in enumerate(rgb_vec):
+        img_dot += img[:, :, channel] * val
+    img_dot /= mag
 
-    col_extract = np.zeros_like(img)
-    col_extract[scoords_y[cic], scoords_x[cic], :] = [255, 255, 255]
+    min_mag = mag - cyl_length / 2
+    max_mag = mag + cyl_length / 2
+
+    # Finds the distance of the colours to the cylinder axis
+    img_cross = np.zeros_like(img_dot)
+    for channel, val in enumerate(rgb_vec):
+        c1 = channel + 1 if channel + 1 < len(rgb_vec) else channel + 1 - len(rgb_vec)
+        c2 = channel + 2 if channel + 2 < len(rgb_vec) else channel + 2 - len(rgb_vec)
+        img_cross += (rgb_vec[c1] * img[:, :, c2] - rgb_vec[c2] * img[:, :, c1]) ** 2
+    distance_to_axis = np.sqrt(img_cross) / mag
+    
+    mask = np.logical_and(
+        np.logical_and(img_dot <= max_mag, img_dot >= min_mag),
+        distance_to_axis <= cyl_radius,
+    ).astype(np.uint8) * 255
 
 
-    return Image.fromarray(col_extract)
+    return Image.fromarray(mask)
 
 
 def Text_from_greyscale(input_image_obj, COL):
