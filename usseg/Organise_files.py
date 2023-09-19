@@ -49,7 +49,6 @@ def get_likely_us(root_dir, pickle_path=None):
                     if file.endswith('.JPG'):
                         try:
                             Fail, df = General_functions.Scan_type_test(os.path.join(subdir, file))
-                            # print(Fail)
                             if Fail == 0:
                                 # Append the path to the list for this patient
                                 patient_path_list.append(os.path.join(subdir, file))
@@ -72,7 +71,6 @@ def get_likely_us(root_dir, pickle_path=None):
                         if file.endswith('.JPG'):
                             try:
                                 Fail, df = General_functions.Scan_type_test(os.path.join(subdir, file))
-                                # print(Fail)
                                 if Fail == 0:
                                     # Append the path to the list for this patient
                                     patient_path_list.append(os.path.join(subdir, file))
