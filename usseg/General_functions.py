@@ -1,5 +1,4 @@
 """ A set of functions to segment and extract data from doppler ultrasound scans"""
-
 # Python imports
 import traceback
 import math
@@ -1068,7 +1067,6 @@ def Colour_extract(input_image_obj, TargetRGB, cyl_length, cyl_radius):
         np.logical_and(img_dot <= max_mag, img_dot >= min_mag),
         distance_to_axis <= cyl_radius,
     ).astype(np.uint8) * 255
-
 
     return Image.fromarray(mask)
 
