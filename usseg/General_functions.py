@@ -1068,7 +1068,7 @@ def Colour_extract(input_image_obj, TargetRGB, cyl_length, cyl_radius):
         distance_to_axis <= cyl_radius,
     ).astype(np.uint8) * 255
 
-    return Image.fromarray(mask)
+    return Image.fromarray(mask).convert("RGB")
 
 
 def Text_from_greyscale(input_image_obj, COL):
