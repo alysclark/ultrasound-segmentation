@@ -1294,7 +1294,7 @@ def Text_from_greyscale(input_image_obj, COL):
                     )
                 break  # Exit the inner loop once a match is found
 
-    Metric_check(df)
+    df = Metric_check(df)
     return Fail, df
 
 def Metric_check(df):

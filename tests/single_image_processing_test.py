@@ -21,7 +21,7 @@ logger = logging.getLogger(__file__)
 
 def test_data_from_image():
     """Test the data_from_image function."""
-    img_path = "Umb_test_image.png"
+    img_path = "Lt_test_image.png"
 
     PIL_image = Image.open(img_path)
     cv2_image = np.array(PIL_image)
@@ -46,7 +46,7 @@ def test_data_from_image():
     # Currently not extracting the PI value so will omit for now
     # TODO: Successfully extract the PI value.
     # values = [70.64, 20.50, 3.45, 1.46, 0.71, 19.89, 34.40, 82.00]
-    values = [70.64, 20.50, 3.45, 0.71, 19.89, 34.40, 82.00]
+    values = [70.64, 20.50, 3.45, 0.71, 19.89, 34.40, 82.00, 00.00]
     assert len(values) == df.shape[0]
     # TODO: Improve text extraction accuracy and thus lower tolerance
     tol = 5e-2
