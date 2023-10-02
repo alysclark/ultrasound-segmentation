@@ -133,7 +133,7 @@ def segment(filenames=None, output_dir=None, pickle_path=None):
             # )  # Loads a pixel access object, where pixel values can be edited
 
             # from General_functions import Colour_extract, Text_from_greyscale
-            COL = General_functions.Colour_extract(PIL_col, [255, 255, 100], 80, 80)
+            COL = General_functions.Colour_extract(PIL_col, [255, 255, 100], 95, 95)
             logger.info("Done Colour extract")
 
             Fail, df = General_functions.Text_from_greyscale(cv2_img, COL)

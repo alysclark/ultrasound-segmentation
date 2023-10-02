@@ -1071,6 +1071,77 @@ def Colour_extract(input_image_obj, TargetRGB, cyl_length, cyl_radius):
     return Image.fromarray(mask).convert("RGB")
 
 
+def appendSpherical_1point(xyz):
+    ptsnew = np.hstack(
+        (xyz, np.zeros(xyz.shape), np.zeros(xyz.shape), np.zeros(xyz.shape))
+    )
+    xy = xyz[0] ** 2 + xyz[1] ** 2
+    ptsnew[3] = np.sqrt(xy)  # xy length
+    ptsnew[4] = np.sqrt(xy + xyz[2] ** 2)  # magnitude of vector (radius)
+    ptsnew[5] = np.arctan(np.divide(ptsnew[1], ptsnew[0])) * (180 / math.pi)  # theta
+    ptsnew[6] = np.arcsin(np.divide(ptsnew[2], ptsnew[4])) * (180 / math.pi)  # alpha
+    return ptsnew
+def Colour_extract_vectorized(input_image_obj, TargetRGB, cyl_length, cyl_radius):
+    """
+    Extracts a target color from an image using a cylindrical filter in RGB space.
+    
+    Args:
+        input_image_filename (str): Path to the input image.
+        TargetRGB (list): Triplet representing the target RGB color.
+        cyl_length (int): Length of the cylindrical filter in RGB space.
+        cyl_radius (int): Radius of the cylindrical filter in RGB space.
+    
+    Returns:
+        PIL.Image.Image: An image where the target color regions are highlighted.
+    """
+    # Convert the target RGB color to spherical coordinates
+    targ = np.array(TargetRGB)
+    out2 = appendSpherical_1point(targ)
+
+    # Calculate the coordinates of the cylinder in RGB space
+    H2 = cyl_length
+    O2 = math.sin(math.radians(out2[6])) * H2
+    A2 = math.cos(math.radians(out2[6])) * H2
+    O1 = math.sin(math.radians(out2[5])) * A2
+    A1 = math.cos(math.radians(out2[5])) * A2
+
+    # Define the start and end points of the cylindrical filter in RGB space
+    R1 = out2[0] - A1
+    G1 = out2[1] - O1
+    B1 = out2[2] - O2
+    R2 = out2[0] + A1
+    G2 = out2[1] + O1
+    B2 = out2[2] + O2
+    start = np.array([R1, G1, B1])
+    end = np.array([R2, G2, B2])
+    r = cyl_radius
+
+    # Convert the image to a numpy array (only considering RGB channels)
+    img_array = input_image_obj
+
+    # Vectorized computation to check if each pixel lies within the cylinder in RGB space
+    # Calculate the vector defining the cylinder axis
+    vec = end - start
+    # Calculate the cylinder's constraint based on its radius
+    const = r * np.linalg.norm(vec)
+    # Calculate the cross products for each pixel in the image
+    cross_products = np.cross(img_array - start, vec)
+    # Calculate the dot products for the start and end points of the cylinder
+    dot_products_start = np.tensordot(img_array - start, vec, axes=([2], [0]))
+    dot_products_end = np.tensordot(img_array - end, vec, axes=([2], [0]))
+    # Generate a boolean mask indicating if a pixel lies within the cylinder
+    mask = (dot_products_start >= 0) & (dot_products_end <= 0) & (np.linalg.norm(cross_products, axis=2) <= const)
+
+    # Create the output image based on the mask, setting target color regions to white and all else to black
+    output_array = np.where(mask[..., None], [255, 255, 255], [0, 0, 0])
+
+    # Convert the numpy array back to an image for the final output
+    output_image = Image.fromarray(np.uint8(output_array)).convert("RGB")
+    
+    return output_image
+
+
+
 def Text_from_greyscale(input_image_obj, COL):
     """
     Function for extracting text from the yellow filtered image.
@@ -1185,6 +1256,20 @@ def Text_from_greyscale(input_image_obj, COL):
     # Split text into lines
     lines = grouped_words #text.split("\n")
 
+    def is_subsequence(target, line):
+        target_idx = 0
+        line_idx = 0
+        
+        # Filter out spaces and hyphens from target
+        filtered_target = [char for char in target if char not in [' ', '-']]
+        
+        while target_idx < len(filtered_target) and line_idx < len(line):
+            if filtered_target[target_idx].lower() == line[line_idx].lower():
+                target_idx += 1
+            line_idx += 1
+
+        return target_idx == len(filtered_target)
+
     # Initialize DataFrame
     df = pd.DataFrame(columns=["Line", "Word", "Value", "Unit"])
 
@@ -1192,8 +1277,8 @@ def Text_from_greyscale(input_image_obj, COL):
     for i, line in enumerate(lines):
         # Loop over target words
         for word in target_words:
-            # Look for word in line
-            if word in line:
+            # Check if target word is a subsequence of the line
+            if is_subsequence(word, line): 
                 # Extract value and unit
                 match = re.search(r"(\-?\d+\.\d+|\-?\d+)\s*([^\d\s]+)?$", line)
                 if match:
@@ -1209,6 +1294,8 @@ def Text_from_greyscale(input_image_obj, COL):
                         {"Line": i + 1, "Word": word, "Value": 0, "Unit": 0},
                         ignore_index=True,
                     )
+                break  # Exit the inner loop once a match is found
+
 
     return Fail, df
 
