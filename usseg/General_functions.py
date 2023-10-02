@@ -1028,7 +1028,6 @@ def _in_cylinder(coord, bot, top, center, const):
     within_rad = np.linalg.norm(np.cross(coord - bot, center.T)) <= const
     return (above_bot and below_top and within_rad).item()
 
-
 def Colour_extract(input_image_obj, TargetRGB, cyl_length, cyl_radius):
     """Extract target colours from image.
 
@@ -1069,7 +1068,6 @@ def Colour_extract(input_image_obj, TargetRGB, cyl_length, cyl_radius):
     ).astype(np.uint8) * 255
 
     return Image.fromarray(mask).convert("RGB")
-
 
 def appendSpherical_1point(xyz):
     ptsnew = np.hstack(
@@ -1167,7 +1165,7 @@ def Text_from_greyscale(input_image_obj, COL):
 
     pixels = np.array(COL)
     data = pytesseract.image_to_data(
-        pixels, output_type=Output.DICT, lang="eng", config="--psm 3 "
+        pixels, output_type=Output.DICT, lang="eng", config="--psm 3 -c tessedit_char_blacklist=l!|"
     )
     if (
         len(data["text"]) < 30
@@ -1269,7 +1267,7 @@ def Text_from_greyscale(input_image_obj, COL):
             line_idx += 1
 
         return target_idx == len(filtered_target)
-
+    
     # Initialize DataFrame
     df = pd.DataFrame(columns=["Line", "Word", "Value", "Unit"])
 
@@ -1296,8 +1294,242 @@ def Text_from_greyscale(input_image_obj, COL):
                     )
                 break  # Exit the inner loop once a match is found
 
-
+    Metric_check(df)
     return Fail, df
+
+def Metric_check(df):
+    """
+	Function to check dataframe values through comparison with their calculations
+
+	Args:
+		df (DataFrame): Extracted data from image
+
+	Returns:
+		df(DataFrame): DataFrame with corrected values after metric checking calculations
+	"""
+        
+    def identify_prefix(lines):
+        # Try to identify the prefix in use
+        for prefix in ["Lt", "Rt", "Umb"]:
+            if lines['Word'].str.contains(prefix).any():
+                print("prefix found")
+                PRF = prefix
+                    
+        target_words = [
+            "Lt Ut-PS",
+            "Lt Ut-ED",
+            "Lt Ut-S/D",
+            "Lt Ut-PI",
+            "Lt Ut-RI",
+            "Lt Ut-MD",
+            "Lt Ut-TAmax",
+            "Lt Ut-HR",
+            "Rt Ut-PS",
+            "Rt Ut-ED",
+            "Rt Ut-S/D",
+            "Rt Ut-PI",
+            "Rt Ut-RI",
+            "Rt Ut-MD",
+            "Rt Ut-TAmax",
+            "Rt Ut-HR",
+            "Umb-PS",
+            "Umb-ED",
+            "Umb-S/D",
+            "Umb-PI",
+            "Umb-RI",
+            "Umb-MD",
+            "Umb-TAmax",
+            "Umb-HR",
+        ]
+        # Splitting the target words based on prefixes
+        target_words = [word for word in target_words if word.startswith(PRF)]
+
+        return PRF, target_words  # Return None if no known prefix is found
+
+    def add_missing_rows(df):
+        # Identify the Prefix
+        prefix, target_words = identify_prefix(df)
+        
+        # Determine Missing Rows
+        existing_words = df['Word'].tolist()
+        missing_targets = [word for word in target_words if word not in existing_words]
+        
+        # Add Missing Rows
+        for target in missing_targets:
+            new_row = {"Word": target, "Value": 0, "Unit": ""}
+            df = df._append(new_row, ignore_index=True)
+        
+        return df
+
+    df = add_missing_rows(df)
+
+    # Peak systolic
+    PS = df.loc[df['Word'].str.contains('PS'), 'Value'].values[0] if df['Word'].str.contains('PS').any() else 0
+    # End diastolic
+    ED = df.loc[df['Word'].str.contains('ED'), 'Value'].values[0] if df['Word'].str.contains('ED').any() else 0
+
+    # Find S/D
+    SoverD_calc = PS / ED
+    # Find RI
+    RI_calc = (PS - ED) / PS
+    # Find TAmax
+    TAmax_calc = (PS + (2 * ED)) / 3
+
+    # Now check whether the PS & ED dependant metrics are consistent between calculated and extracted:
+    # Extracted values with default as None if not present
+    SoverD_extracted = df.loc[df['Word'].str.contains('S/D'), 'Value'].values[0] if df['Word'].str.contains('S/D').any() else None
+    RI_extracted = df.loc[df['Word'].str.contains('RI'), 'Value'].values[0] if df['Word'].str.contains('RI').any() else None
+    TAmax_extracted = df.loc[df['Word'].str.contains('TAmax'), 'Value'].values[0] if df['Word'].str.contains('TAmax').any() else None
+    comparison_dataframe = pd.DataFrame(index=['PS_extracted','ED_extracted','SoverD_extracted','RI_extracted','TAmax_extracted',
+                                               'SoverD_calc','RI_calc','TAmax_calc','PS_calc','ED_calc','ED_from_SoverD','ED_from_RI',
+                                               'SoverD_from_ED_from_RI','RI_from_ED_from_SoverD','TAmax_from_ED_from_SoverD','TAmax_from_ED_from_RI',
+                                               'PS_from_SoverD','PS_from_RI','SoverD_from_PS_from_RI','RI_from_PS_from_SoverD','TAmax_from_PS_from_SoverD',
+                                               'TAmax_from_PS_from_RI'], columns=['Extracted'])
+    # List of all the extracted metrics that exist
+    existing_metrics = [metric for metric in [SoverD_extracted, RI_extracted, TAmax_extracted] if metric is not None]
+    values_to_insert = {
+        'PS_extracted': PS,
+        'ED_extracted': ED,
+        'SoverD_extracted': SoverD_extracted,
+        'RI_extracted': RI_extracted,
+        'TAmax_extracted': TAmax_extracted
+    }
+
+    for key, value in values_to_insert.items():
+        comparison_dataframe.loc[key, 'Extracted'] = value
+        # Check closeness and store conditions met in a list
+
+    values_to_insert = {
+        'SoverD_calc': SoverD_calc,
+        'RI_calc': RI_calc,
+        'TAmax_calc': TAmax_calc
+    }
+    for key, value in values_to_insert.items():
+        comparison_dataframe.loc[key, 'First_calc'] = value
+        # Check closeness and store conditions met in a list
+
+
+    def Metric_comparison(c_df,col):
+
+        # Tolerance level (you can adjust this based on your requirements)
+        tolerance1 = 0.1
+        tolerance2 = 2 # This tolerance is larger because the equation we used for TAmax is approximate
+        conditions_met = []
+        for parameter, extracted_name in [('SoverD', 'SoverD_extracted'), ('RI', 'RI_extracted'), ('TAmax', 'TAmax_extracted')]:
+            extracted_value = c_df['Extracted'][extracted_name]
+            
+            if extracted_value is not None:
+                for row_name, calc_value in c_df.iloc[:, col].items():
+                    if str(row_name).startswith(extracted_name[:-9]):  # If row name starts with the parameter name
+                        tolerance = tolerance1 if parameter != 'TAmax' else tolerance2
+                        if abs(calc_value - extracted_value) < tolerance:
+                            conditions_met.append(row_name)
+                            break  # Exit the inner loop once a match is found
+
+        return conditions_met
+
+    conditions_met = Metric_comparison(comparison_dataframe,1)
+
+    # You've already extracted PS, SoverD_extracted, RI_extracted, and TAmax_extracted
+
+    # Check if all 3 metrics are inconsistent
+    if len(conditions_met) == 0:  # All 3 are not consistent
+        # Assume PS was extracted correctly, compute ED from the 3 metrics:
+        try:
+            # Recalculate ED using extracted metrics and assumed correct PS
+            ED_from_SoverD = PS / SoverD_extracted if SoverD_extracted else None
+            ED_from_RI = PS * (1 - RI_extracted) if RI_extracted else None
+            # Now, using these new ED values, recalculate the metrics
+            SoverD_from_ED_from_RI = PS / ED_from_RI if ED_from_RI else None
+            RI_from_ED_from_SoverD = (PS - ED_from_SoverD) / PS if ED_from_SoverD else None
+            TAmax_from_ED_from_SoverD = (PS + 2 * ED_from_SoverD) / 3 if ED_from_SoverD else None
+            TAmax_from_ED_from_RI = (PS + 2 * ED_from_RI) / 3 if ED_from_RI else None
+
+            values_to_insert = {
+                'ED_from_SoverD': ED_from_SoverD,
+                'ED_from_RI': ED_from_RI,
+                'SoverD_from_ED_from_RI': SoverD_from_ED_from_RI,
+                'RI_from_ED_from_SoverD': RI_from_ED_from_SoverD,
+                'TAmax_from_ED_from_SoverD': TAmax_from_ED_from_SoverD,
+                'TAmax_from_ED_from_RI': TAmax_from_ED_from_RI
+            }
+            for key, value in values_to_insert.items():
+                comparison_dataframe.loc[key, 'Second_calc'] = value
+                # Check closeness and store conditions met in a list
+
+            # Check conditions met with these values:
+            conditions_met = Metric_comparison(comparison_dataframe,2)
+            if len(conditions_met) == 0: # If our assumption above was wrong
+                # Recalculate PS using the extracted metrics and assumed correct ED
+                PS_from_SoverD = SoverD_extracted * ED if SoverD_extracted else None
+                PS_from_RI = ED / (1 - RI_extracted) if RI_extracted else None
+                # Now, using these new PS values, recalculate the other metrics
+                SoverD_from_PS_from_RI = PS_from_RI / ED if PS_from_RI else None
+                RI_from_PS_from_SoverD = (PS_from_SoverD - ED) / PS_from_SoverD if PS_from_SoverD else None
+                TAmax_from_PS_from_SoverD = (PS_from_SoverD + 2 * ED) / 3 if PS_from_SoverD else None
+                TAmax_from_PS_from_RI = (PS_from_RI + 2 * ED) / 3 if PS_from_RI else None
+
+                values_to_insert = {
+                    'PS_from_SoverD': PS_from_SoverD,
+                    'PS_from_RI': PS_from_RI,
+                    'SoverD_from_PS_from_RI': SoverD_from_PS_from_RI,
+                    'RI_from_PS_from_SoverD': RI_from_PS_from_SoverD,
+                    'TAmax_from_PS_from_SoverD': TAmax_from_PS_from_SoverD,
+                    'TAmax_from_PS_from_RI': TAmax_from_PS_from_RI
+                }
+                for key, value in values_to_insert.items():
+                    comparison_dataframe.loc[key, 'Third_calc'] = value
+                    # Check closeness and store conditions met in a list
+
+                conditions_met = Metric_comparison(comparison_dataframe,3)
+                # now check the conditions again:
+                if len(conditions_met)>0:
+
+                    row_name = conditions_met[0]
+
+                    parts = row_name.split('_from_')
+                    desired_row_name = parts[1] + '_from_' + parts[2]
+                    new_value = comparison_dataframe.loc[desired_row_name, 'Third_calc'] 
+                    # We have calculated the new PS!
+                    print(f"Recalculated PS (from RI): {new_value}")
+                    df.loc[df['Word'].str.contains('PS'), 'Value'] = new_value
+                    PS = df.loc[df['Word'].str.contains('PS'), 'Value'].values[0]
+                    ED = df.loc[df['Word'].str.contains('ED'), 'Value'].values[0]
+                    # Find S/D
+                    df.loc[df['Word'].str.contains('S/D'), 'Value'] =  PS / ED
+                    # Find RI
+                    df.loc[df['Word'].str.contains('RI'), 'Value'] = (PS - ED) / PS
+                    # Find TAmax
+                    df.loc[df['Word'].str.contains('TAmax'), 'Value'] = (PS + (2 * ED)) / 3
+
+
+
+        except ZeroDivisionError:
+            print("Error: Division by zero encountered. Check the extracted values.")
+    elif len(conditions_met) < 3:
+        # At least 1 of the metrics is consistent, therefore PS and ED can be assumed to be correct,
+        # Caclulate the inconsistent metrics from the PS and ED calculations
+        print("At least one text extraction error, correcting...")
+
+        if 'SoverD' not in conditions_met:
+            # Find S/D
+            df.loc[df['Word'].str.contains('S/D'), 'Value'] =  PS / ED
+        if 'RI' not in conditions_met:
+            # Find RI
+            df.loc[df['Word'].str.contains('RI'), 'Value'] = (PS - ED) / PS
+        if 'TAmax' not in conditions_met:
+            # Find TAmax
+            df.loc[df['Word'].str.contains('TAmax'), 'Value'] = (PS + (2 * ED)) / 3
+    else:
+        print("All metrics are consistent.")
+
+
+
+
+    return df
+
+
+
 
 def Scan_type_test(input_image_filename):
     """
