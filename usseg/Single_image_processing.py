@@ -31,7 +31,7 @@ def data_from_image(PIL_img,cv2_img):
     """
     # Extracts yellow text from image
     PIL_image_RGB = PIL_img.convert("RGB")  # We need RGB, so convert here. with PIL
-    COL = General_functions.Colour_extract_vectorized(PIL_image_RGB, [255, 255, 100], 100, 100)
+    COL = General_functions.Colour_extract_vectorized(PIL_image_RGB, [255, 255, 100], 100, 150)
 
     #COL = General_functions.Colour_extract(PIL_image_RGB, [255, 255, 100], 100, 100)
     text_extract_failed, df = General_functions.Text_from_greyscale(cv2_img, COL)

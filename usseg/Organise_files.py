@@ -30,7 +30,7 @@ def get_likely_us(root_dir, pickle_path=None):
     Returns:
         return_val (bool) : True if sucessful, False otherwise.
     """
-# root diretory to search
+    # root diretory to search
 
     # Initialize a dictionary to store the paths for each patient
     patient_paths = {}

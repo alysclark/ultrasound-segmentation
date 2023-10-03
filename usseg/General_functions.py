@@ -1293,8 +1293,12 @@ def Text_from_greyscale(input_image_obj, COL):
                         ignore_index=True,
                     )
                 break  # Exit the inner loop once a match is found
+    
+    try: # This is still a test really
+        df = Metric_check(df)
+    except:
+        print("metric check failed")
 
-    df = Metric_check(df)
     return Fail, df
 
 def Metric_check(df):
@@ -1502,6 +1506,24 @@ def Metric_check(df):
                     # Find TAmax
                     df.loc[df['Word'].str.contains('TAmax'), 'Value'] = (PS + (2 * ED)) / 3
 
+            elif len(conditions_met)>0:
+
+                    row_name = conditions_met[0]
+
+                    parts = row_name.split('_from_')
+                    desired_row_name = parts[1] + '_from_' + parts[2]
+                    new_value = comparison_dataframe.loc[desired_row_name, 'Second_calc'] 
+                    # We have calculated the new PS!
+                    print(f"Recalculated PS (from RI): {new_value}")
+                    df.loc[df['Word'].str.contains('ED'), 'Value'] = new_value
+                    PS = df.loc[df['Word'].str.contains('PS'), 'Value'].values[0]
+                    ED = df.loc[df['Word'].str.contains('ED'), 'Value'].values[0]
+                    # Find S/D
+                    df.loc[df['Word'].str.contains('S/D'), 'Value'] =  PS / ED
+                    # Find RI
+                    df.loc[df['Word'].str.contains('RI'), 'Value'] = (PS - ED) / PS
+                    # Find TAmax
+                    df.loc[df['Word'].str.contains('TAmax'), 'Value'] = (PS + (2 * ED)) / 3
 
 
         except ZeroDivisionError:
