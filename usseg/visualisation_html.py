@@ -109,7 +109,7 @@ def generate_html_from_pkl():
         scan_paths,Digitized_scans, Annotated_scans,Text_data = pickle.load(f)
 
     html_str = generate_html(scan_paths, Annotated_scans, Digitized_scans, Text_data)
-    with open('output.html', 'w') as f:
+    with open('output3.html', 'w') as f:
         f.write(html_str)
 
 if __name__ == "__main__":

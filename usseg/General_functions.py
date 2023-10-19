@@ -1156,6 +1156,15 @@ def Text_from_greyscale(input_image_obj, COL):
 
     PIX = COL.load()
     img = input_image_obj
+
+
+    from PIL import ImageFilter
+    import numpy as np
+    from scipy.ndimage import binary_dilation
+
+    # 2. Apply slight Gaussian blur
+    smoothed_image = COL.filter(ImageFilter.GaussianBlur(radius=1))
+
     for y in range(
         int(COL.size[1] * 0.45), COL.size[1]
     ):  # Exclude bottom 3rd of image - these are fails
@@ -1163,9 +1172,9 @@ def Text_from_greyscale(input_image_obj, COL):
             PIX[x, y] = (0, 0, 0)
 
 
-    pixels = np.array(COL)
+    pixels = np.array(smoothed_image)
     data = pytesseract.image_to_data(
-        pixels, output_type=Output.DICT, lang="eng", config="--psm 3 -c tessedit_char_blacklist=l!|"
+        pixels, output_type=Output.DICT, lang="eng", config="--psm 3 -c tessedit_char_blacklist=l!|$"
     )
     if (
         len(data["text"]) < 30
@@ -1177,12 +1186,12 @@ def Text_from_greyscale(input_image_obj, COL):
     # Loop through each word and draw a box around it
     y_center = np.zeros(len(data["text"])) # Variable to store the y-center of each bounding box of text detected.
     for i in range(len(data["text"])):
-        if data["text"][i] != '':
+        if data["text"][i] != '' and data["text"][i] != ' ':
             x = data["left"][i]
             y = data["top"][i]
             w = data["width"][i]
             h = data["height"][i]
-            if int(data["conf"][i]) > 1:
+            if int(data["conf"][i]) > -1:
                 cv2.rectangle(img, (x, y), (x + w, y + h), (0, 0, 255), 2)
                 y_center[i] = y + (h/2)
             else:
@@ -1217,7 +1226,7 @@ def Text_from_greyscale(input_image_obj, COL):
 
         return grouped_words
 
-    tolerance = 3  # Adjust the tolerance value - the max difference between y-coords considered on the same line
+    tolerance = 5  # Adjust the tolerance value - the max difference between y-coords considered on the same line
     grouped_words = group_similar_numbers(y_center, tolerance, data["text"])
 
     # Display image
@@ -1250,9 +1259,47 @@ def Text_from_greyscale(input_image_obj, COL):
         "Umb-TAmax",
         "Umb-HR",
     ]
-
+    
     # Split text into lines
     lines = grouped_words #text.split("\n")
+    # Initialize DataFrame
+    df = pd.DataFrame(columns=["Line", "Word", "Value", "Unit"])
+
+    prefixes = ["Lt", "Rt", "Umb"]
+    prefix_counts = {prefix: sum(1 for line in lines if prefix in line) for prefix in prefixes}
+    most_likely_prefix = max(prefix_counts, key=prefix_counts.get)
+
+    # Filter target words based on the most likely prefix
+    target_words = [word for word in target_words if word.startswith(most_likely_prefix)]
+    word_order = [word for word in target_words if word.startswith(most_likely_prefix)]
+
+    # Step 1: Exact matching
+    matched_lines = set()  # to store the indices of lines that have been matched
+
+    for i, line in enumerate(lines):
+        for word in target_words:
+            if word in line:  # checking for exact match
+                # Extract value and unit
+                match = re.search(r"(\-?\d+(\s*\d+)*\.\s*\d+|\-?\d+(\s*\d+)*)\s*([^\d\s]+)?$", line)
+
+                if match:
+                    value = float(match.group(1).replace(' ', ''))
+                    unit = match.group(4) if match.group(4) else ""
+                    df = df._append(
+                        {"Line": i + 1, "Word": word, "Value": value, "Unit": unit},
+                        ignore_index=True,
+                    )
+                    target_words.remove(word)
+                else:
+                    # logger.warning("couldn't find numeric data for line.")
+                    df = df._append(
+                        {"Line": i + 1, "Word": word, "Value": 0, "Unit": 0},
+                        ignore_index=True,
+                    )
+                    target_words.remove(word)
+                matched_lines.add(i)
+                break  # Exit the inner loop once a match is found
+
 
     def is_subsequence(target, line):
         target_idx = 0
@@ -1268,32 +1315,113 @@ def Text_from_greyscale(input_image_obj, COL):
 
         return target_idx == len(filtered_target)
     
-    # Initialize DataFrame
-    df = pd.DataFrame(columns=["Line", "Word", "Value", "Unit"])
 
-    # Loop over lines
+    # Step 2: Subsequence matching for unmatched lines
     for i, line in enumerate(lines):
-        # Loop over target words
+        if i not in matched_lines:  # only process unmatched lines
+            for word in target_words:
+                if is_subsequence(word, line): 
+                    # Extract value and unit
+                    match = re.search(r"(\-?\d+\.\d+|\-?\d+)\s*([^\d\s]+)?$", line)
+                    if match:
+                        value = float(match.group(1))
+                        unit = match.group(2) if match.group(2) else ""
+                        df = df._append(
+                            {"Line": i + 1, "Word": word, "Value": value, "Unit": unit},
+                            ignore_index=True,
+                        )
+                        target_words.remove(word)
+                    else:
+                        # logger.warning("couldn't find numeric data for line.")
+                        df = df._append(
+                            {"Line": i + 1, "Word": word, "Value": 0, "Unit": 0},
+                            ignore_index=True,
+                        )
+                        target_words.remove(word)
+                    matched_lines.add(i)
+                    break  # Exit the inner loop once a match is found
+
+    
+    import Levenshtein
+
+    def find_closest_target(line, target_words):
+        min_distance = float('inf')
+        closest_word = None
+        
         for word in target_words:
-            # Check if target word is a subsequence of the line
-            if is_subsequence(word, line): 
+            distance = Levenshtein.distance(line, word)
+            if distance < min_distance:
+                min_distance = distance
+                closest_word = word
+                
+        return closest_word, min_distance
+
+    # Set a threshold for acceptable similarity
+    threshold = 7
+
+    for i, line in enumerate(lines):
+        if i not in matched_lines:  # only process unmatched lines
+            closest_word, distance = find_closest_target(line, target_words)
+            
+            if distance <= threshold:
                 # Extract value and unit
-                match = re.search(r"(\-?\d+\.\d+|\-?\d+)\s*([^\d\s]+)?$", line)
+                match = re.search(r"(\-?\d+(\s*\d+)*\.\s*\d+|\-?\d+(\s*\d+)*)\s*([^\d\s]+)?$", line)
                 if match:
-                    value = float(match.group(1))
-                    unit = match.group(2) if match.group(2) else ""
+                    value = float(match.group(1).replace(' ', ''))
+                    unit = match.group(4) if match.group(4) else ""
+                    df = df._append(
+                        {"Line": i + 1, "Word": closest_word, "Value": value, "Unit": unit},
+                        ignore_index=True,
+                    )
+                    target_words.remove(closest_word) 
+                matched_lines.add(i)
+
+    import Levenshtein
+
+    if target_words:
+        # Create a distance matrix
+        num_lines = len(lines)
+        num_target_words = len(target_words)
+        distance_matrix = np.zeros((num_lines, num_target_words))
+
+        for i, line in enumerate(lines):
+            if i not in matched_lines:
+                for j, word in enumerate(target_words):
+                    distance_matrix[i, j] = Levenshtein.distance(line, word)
+
+        matches = {}
+        for j, word in enumerate(target_words):
+            # Find the line with the smallest non-zero distance for the current target word
+            line_indices_with_non_zero_distances = np.where(distance_matrix[:, j] > 0)[0]
+            if len(line_indices_with_non_zero_distances) > 0:
+                i = line_indices_with_non_zero_distances[np.argmin(distance_matrix[line_indices_with_non_zero_distances, j])]
+                line = lines[i]
+                # Add to matches
+                matches[line] = word
+                
+                # Extract value and unit from the line and add to the DataFrame
+                match = re.search(r"(\-?\d+(\s*\d+)*\.\s*\d+|\-?\d+(\s*\d+)*)\s*([^\d\s]+)?$", line)
+                if match:
+                    value = float(match.group(1).replace(' ', ''))
+                    unit = match.group(4) if match.group(4) else ""
                     df = df._append(
                         {"Line": i + 1, "Word": word, "Value": value, "Unit": unit},
                         ignore_index=True,
                     )
                 else:
-                    logger.warning("couldn't find numeric data for line.")
                     df = df._append(
                         {"Line": i + 1, "Word": word, "Value": 0, "Unit": 0},
                         ignore_index=True,
                     )
-                break  # Exit the inner loop once a match is found
-    
+                matched_lines.add(i)
+                
+                # Remove the matched line from further consideration
+                distance_matrix[i, :] = np.inf
+
+
+    # Create a mask for each word in the word_order list and concatenate them in order
+    df = pd.concat([df.loc[df['Word'] == word] for word in word_order]).reset_index(drop=True)
+
     try: # This is still a test really
         df = Metric_check(df)
     except:
@@ -1367,6 +1495,27 @@ def Metric_check(df):
 
     df = add_missing_rows(df)
 
+
+    def check_PI_value(value): # Decimal can be misread, so common sense check.
+        # If the value is between 0 and 2, return it as is
+        if 0 <= value <= 3:
+            return value
+
+        # If the value is between 3 and 10, divide it by 10
+        if 3 <= value <= 10:
+            return value / 10
+
+        # If the value is between 10 and 200, divide it by 100
+        if 10 <= value <= 200:
+            return value / 100
+
+        # If the value is outside of these ranges, return a default or handle accordingly
+        return value  # or return some default value or raise an exception
+
+    # Example usage:
+    PI = df.loc[df['Word'].str.contains('PI'), 'Value'].values[0] if df['Word'].str.contains('PI').any() else 0
+    df.loc[df['Word'].str.contains('PI'), 'Value'] = check_PI_value(PI)
+
     # Peak systolic
     PS = df.loc[df['Word'].str.contains('PS'), 'Value'].values[0] if df['Word'].str.contains('PS').any() else 0
     # End diastolic
@@ -1416,7 +1565,7 @@ def Metric_check(df):
     def Metric_comparison(c_df,col):
 
         # Tolerance level (you can adjust this based on your requirements)
-        tolerance1 = 0.1
+        tolerance1 = 0.2
         tolerance2 = 2 # This tolerance is larger because the equation we used for TAmax is approximate
         conditions_met = []
         for parameter, extracted_name in [('SoverD', 'SoverD_extracted'), ('RI', 'RI_extracted'), ('TAmax', 'TAmax_extracted')]:
@@ -1500,11 +1649,11 @@ def Metric_check(df):
                     PS = df.loc[df['Word'].str.contains('PS'), 'Value'].values[0]
                     ED = df.loc[df['Word'].str.contains('ED'), 'Value'].values[0]
                     # Find S/D
-                    df.loc[df['Word'].str.contains('S/D'), 'Value'] =  PS / ED
+                    df.loc[df['Word'].str.contains('S/D'), 'Value'] =  round(PS / ED,2)
                     # Find RI
-                    df.loc[df['Word'].str.contains('RI'), 'Value'] = (PS - ED) / PS
+                    df.loc[df['Word'].str.contains('RI'), 'Value'] = round((PS - ED) / PS,2)
                     # Find TAmax
-                    df.loc[df['Word'].str.contains('TAmax'), 'Value'] = (PS + (2 * ED)) / 3
+                    df.loc[df['Word'].str.contains('TAmax'), 'Value'] = round((PS + (2 * ED)) / 3,2)
 
             elif len(conditions_met)>0:
 
@@ -1519,11 +1668,11 @@ def Metric_check(df):
                     PS = df.loc[df['Word'].str.contains('PS'), 'Value'].values[0]
                     ED = df.loc[df['Word'].str.contains('ED'), 'Value'].values[0]
                     # Find S/D
-                    df.loc[df['Word'].str.contains('S/D'), 'Value'] =  PS / ED
+                    df.loc[df['Word'].str.contains('S/D'), 'Value'] =  round(PS / ED,2)
                     # Find RI
-                    df.loc[df['Word'].str.contains('RI'), 'Value'] = (PS - ED) / PS
+                    df.loc[df['Word'].str.contains('RI'), 'Value'] = round((PS - ED) / PS,2)
                     # Find TAmax
-                    df.loc[df['Word'].str.contains('TAmax'), 'Value'] = (PS + (2 * ED)) / 3
+                    df.loc[df['Word'].str.contains('TAmax'), 'Value'] = round((PS + (2 * ED)) / 3,2)
 
 
         except ZeroDivisionError:
@@ -1535,13 +1684,13 @@ def Metric_check(df):
 
         if 'SoverD' not in conditions_met:
             # Find S/D
-            df.loc[df['Word'].str.contains('S/D'), 'Value'] =  PS / ED
+            df.loc[df['Word'].str.contains('S/D'), 'Value'] =  round(PS / ED,2)
         if 'RI' not in conditions_met:
             # Find RI
-            df.loc[df['Word'].str.contains('RI'), 'Value'] = (PS - ED) / PS
+            df.loc[df['Word'].str.contains('RI'), 'Value'] = round((PS - ED) / PS,2)
         if 'TAmax' not in conditions_met:
             # Find TAmax
-            df.loc[df['Word'].str.contains('TAmax'), 'Value'] = (PS + (2 * ED)) / 3
+            df.loc[df['Word'].str.contains('TAmax'), 'Value'] = round((PS + (2 * ED)) / 3,2)
     else:
         print("All metrics are consistent.")
 

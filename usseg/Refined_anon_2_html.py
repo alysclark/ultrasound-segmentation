@@ -119,7 +119,7 @@ def segment(filenames=None, output_dir=None, pickle_path=None):
     Annotated_scans = []
     Digitized_scans = []
 
-    for input_image_filename in filenames[0:5]:  # Iterare through all file names and populate excel file
+    for input_image_filename in filenames:  # Iterare through all file names and populate excel file
         # input_image_filename = "E:/us-data-anon/0000/IHE_PDI/00003511/AA3A43F2/AAD8766D/0000371E\\EEEAE224.JPG"
         image_name = os.path.basename(input_image_filename)
         print(input_image_filename)
@@ -133,7 +133,7 @@ def segment(filenames=None, output_dir=None, pickle_path=None):
             # )  # Loads a pixel access object, where pixel values can be edited
 
             # from General_functions import Colour_extract, Text_from_greyscale
-            COL = General_functions.Colour_extract(PIL_col, [255, 255, 100], 95, 95)
+            COL = General_functions.Colour_extract_vectorized(PIL_col, [255, 255, 100], 150, 90)
             logger.info("Done Colour extract")
 
             Fail, df = General_functions.Text_from_greyscale(cv2_img, COL)
