@@ -15,70 +15,63 @@ import toml
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 sys.path.append(BASE_DIR)
 from usseg import General_functions
+from concurrent.futures import ThreadPoolExecutor
+import os
+import re
+import traceback
+# ... other imports ...
 
-def get_likely_us(root_dir, pickle_path=None):
-    """Searches a directory and identifies the images that are likely to be doppler ultrasounds.
+def check_file_for_us(file_path):
+    """Check a single file to see if it's a likely ultrasound and return its path."""
+    if file_path.endswith('.JPG'):
+        try:
+            Fail, df = General_functions.Scan_type_test(file_path)
+            if Fail == 0:
+                # Extract patient ID from the file path
+                match = re.search(r"\d{4}", file_path)
+                if match:
+                    patient_id = match.group(0)
+                    return (patient_id, file_path)
+        except Exception:
+            traceback.print_exc()
+    return None
 
-    Args:
-        root_dir (str) : Path to the root directory .
-        pickle_path (str or bool) : If pickle_path is False, will not store the
-            list of likely us images as a pickle file. If None,
-            will load the pickle path from "config.toml".
-            Else if a string, will dump the pickled list to the specified path.
-            Defaults to None.
-
-    Returns:
-        return_val (bool) : True if sucessful, False otherwise.
-    """
-    # root diretory to search
+def get_likely_us(root_dir, pickle_path=None, use_parallel=True):
+    """Searches a directory and identifies the images that are likely to be doppler ultrasounds."""
 
     # Initialize a dictionary to store the paths for each patient
     patient_paths = {}
 
-    for patient_dir in os.listdir(root_dir):  # If the root_dir is to a folder containing multiple patients
-        # Check if the directory name is a patient ID (4 digits)
-        if len(patient_dir) == 4 and patient_dir.isdigit():
-            patient_id = patient_dir
-            # Initialize a list to store the paths for this patient
-            patient_path_list = []
+    # Check if the root_dir is a directory or a single file
+    if os.path.isdir(root_dir):
+        # Collect all JPG files from the root directory
+        all_files = [os.path.join(subdir, file) for subdir, _, files in os.walk(root_dir) for file in files if file.endswith('.JPG')]
 
-            # Traverse the patient directory
-            patient_dir_path = os.path.join(root_dir, patient_dir)
-            for subdir, dirs, files in os.walk(patient_dir_path):
-                for file in files:
-                    if file.endswith('.JPG'):
-                        try:
-                            Fail, df = General_functions.Scan_type_test(os.path.join(subdir, file))
-                            if Fail == 0:
-                                # Append the path to the list for this patient
-                                patient_path_list.append(os.path.join(subdir, file))
-                        except Exception:
-                            traceback.print_exc()  # prints the error message and traceback
-                            continue
-            # Add the list of paths to the dictionary for this patient
-            patient_paths[patient_id] = patient_path_list
-        else:  # if the root_dir is to a specific patient folder
-            match = re.search(r"\d{4}", root_dir)
-            if match:
-                patient_id = match.group(0)
-                # Initialize a list to store the paths for this patient
-                patient_path_list = []
+        if use_parallel:
+            # Using ThreadPoolExecutor to parallelize the file processing
+            with ThreadPoolExecutor() as executor:
+                results = list(executor.map(check_file_for_us, all_files))
+        else:
+            results = list(map(check_file_for_us, all_files))
 
-                # Traverse the patient directory
-                patient_dir_path = os.path.join(root_dir, patient_dir)
-                for subdir, dirs, files in os.walk(patient_dir_path):
-                    for file in files:
-                        if file.endswith('.JPG'):
-                            try:
-                                Fail, df = General_functions.Scan_type_test(os.path.join(subdir, file))
-                                if Fail == 0:
-                                    # Append the path to the list for this patient
-                                    patient_path_list.append(os.path.join(subdir, file))
-                            except Exception:
-                                traceback.print_exc()  # prints the error message and traceback
-                                continue
-                # Add the list of paths to the dictionary for this patient
-                patient_paths[patient_id] = patient_path_list
+        # Process results and populate patient_paths
+        for res in results:
+            if res:
+                patient_id, file_path = res
+                if patient_id in patient_paths:
+                    patient_paths[patient_id].append(file_path)
+                else:
+                    patient_paths[patient_id] = [file_path]
+
+    elif os.path.isfile(root_dir):
+        # If it's a single file, directly use the check_file_for_us function
+        result = check_file_for_us(root_dir)
+        if result:
+            patient_id, file_path = result
+            patient_paths[patient_id] = [file_path]
+    else:
+        print(f"{root_dir} is neither a valid directory nor a file.")
+        return None
 
     # save the patient_paths dictionary to a file in current directory
     if pickle_path is not False:
@@ -88,7 +81,11 @@ def get_likely_us(root_dir, pickle_path=None):
         with open(pickle_path, 'wb') as f:
             pickle.dump(patient_paths, f)
 
-    return pickle_path
+    # Convert dictionary values to a list
+    all_paths = [path for sublist in patient_paths.values() for path in sublist]
+
+    return all_paths
+
     
 if __name__ == "__main__":
 

@@ -126,6 +126,7 @@ def segment(filenames=None, output_dir=None, pickle_path=None):
 
         try:  # Try text extraction
             colRGBA = Image.open(input_image_filename)  # These images are in RGBA form
+            #colRGBA = General_functions.upscale_to_fixed_longest_edge(colRGBA)  # upscale to longest edge
             PIL_col = colRGBA.convert("RGB")  # We need RGB, so convert here. with PIL
             cv2_img = cv2.imread(input_image_filename) # with cv2.
             # pix = (
@@ -133,7 +134,7 @@ def segment(filenames=None, output_dir=None, pickle_path=None):
             # )  # Loads a pixel access object, where pixel values can be edited
 
             # from General_functions import Colour_extract, Text_from_greyscale
-            COL = General_functions.Colour_extract_vectorized(PIL_col, [255, 255, 100], 150, 90)
+            COL = General_functions.Colour_extract_vectorized(PIL_col, [255, 255, 100], 95, 95)
             logger.info("Done Colour extract")
 
             Fail, df = General_functions.Text_from_greyscale(cv2_img, COL)

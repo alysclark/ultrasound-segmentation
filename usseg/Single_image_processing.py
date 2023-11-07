@@ -30,6 +30,7 @@ def data_from_image(PIL_img,cv2_img):
         XYdata (list) : X and Y coordinates of the extracted segmentation.
     """
     # Extracts yellow text from image
+    #PIL_img , cv2_img = General_functions.upscale_both_images(PIL_img,cv2_img)
     PIL_image_RGB = PIL_img.convert("RGB")  # We need RGB, so convert here. with PIL
     COL = General_functions.Colour_extract_vectorized(PIL_image_RGB, [255, 255, 100], 95, 95)
 

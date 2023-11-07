@@ -46,6 +46,7 @@ def main(root_dir):
     filenames = prof(usseg.get_likely_us, root_dir)
 
     # Segments and digitises the pre-selected ultrasound images.
+    #filenames = "E:/us-data-anon/0000\IHE_PDI/00003511\AA752528\AA53DB17/0000DE5F/EEF4366C.JPG"
     prof(usseg.segment, filenames)
 
     # Generates an output.html of the segmented output
@@ -53,5 +54,5 @@ def main(root_dir):
 
 if __name__ == "__main__":
     root_dir = toml.load("config.toml")["root_dir"]
-    root_dir = "E:/us-data-anon-test"
+    root_dir = "E:/us-data-anon/0039"
     main(root_dir)

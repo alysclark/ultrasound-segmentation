@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "usseg"
-version = "0.6.0"
+version = "0.6.3"
 description = "Tools to segment doppler ultrasound signals from scan images."
 authors = ["Dale Kernot <874043@swansea.ac.uk>"]
 license = "GPL-v3-or-later"
@@ -21,6 +21,7 @@ plotly = "^5.14.1"
 toml = "^0.10.2"
 scikit-learn = "^1.2.2"
 opencv-contrib-python = "^4.7.0.72"
+super-image = "^0.1.7"
 
 
 [tool.poetry.group.dev.dependencies]

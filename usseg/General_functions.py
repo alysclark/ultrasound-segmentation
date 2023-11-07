@@ -42,6 +42,35 @@ class _HashableArray(np.ndarray):
             return hash(tuple(self.view()))
         return hash(self.view().item)
 
+import threading
+import tkinter as tk
+
+root = tk.Tk()  # Assuming you have a reference to the main tkinter window
+
+def execute_on_main_thread_and_wait(func, *args, **kwargs):
+    if threading.current_thread() == threading.main_thread():
+        return func(*args, **kwargs)
+    else:
+        result = None
+        exception = None
+        event = threading.Event()
+
+        def callback():
+            nonlocal result, exception
+            try:
+                result = func(*args, **kwargs)
+            except Exception as e:
+                exception = e
+            finally:
+                event.set()  # Signal completion
+
+        root.after(0, callback)
+        event.wait()  # Block until the function completes on the main thread
+        
+        if exception:
+            raise exception  # Re-raise any exception that occurred on the main thread
+
+        return result
 
 def Initial_segmentation(input_image_obj):
     """Perform an initial corse segmentation of the waveform.
@@ -766,10 +795,17 @@ def Search_for_labels(
 
     cv2.drawContours(ROI3, Final_TickIDS, -1, [255], 1)
 
+    def correct_number_format(s):
+        # Check numbers dont end in a '-'
+        # Using regex to identify the pattern
+        pattern = r'(-?\d+)-$'
+        return re.sub(pattern, r'\1', s)
+
+
     number = []
     for i in range(len(extracted_text_data["text"])):
-        if extracted_text_data["text"][i] != "":
-            number.append(extracted_text_data["text"][i])
+        if extracted_text_data["text"][i] != "" and extracted_text_data["text"][i] != "-":
+            number.append(correct_number_format(extracted_text_data["text"][i]))
 
     empty_to_fill = np.zeros((image.shape[0], image.shape[1]))
 
@@ -789,6 +825,12 @@ def Search_for_labels(
 
 def Plot_Digitized_data(Rticks, Rlocs, Lticks, Llocs, top_curve_coords):
     # Function to digitize the segmetned data:
+
+    #We will have problems if the right axes only has 1 tick and that tick is equal to the minimum on the left axis
+    if len(Rticks) == 1:
+        Rticks.append(Lticks[-1])
+        Rlocs.append([Rlocs[-1][0],Llocs[-1][1]])
+
 
     Rticks = list(map(int, Rticks))
     XmaxtickR = max(Rticks)
@@ -947,7 +989,9 @@ def Plot_correction(Xplot, Yplot, df):
         plt.plot(x_time[peaks], y[peaks], "x")
         plt.plot(x_time[troughs], y[troughs], "x")
         # plt.plot(x_time[troughs[1:-1]],y[troughs[1:-1]],"x")
-        plt.xlim((min(x_time), max(x_time)))
+        # Check if any value in x_time is NaN or zero
+        if not any(np.isnan(x) or x == 0 or np.isinf(x) for x in x_time):
+            plt.xlim((min(x_time), max(x_time)))
         plt.ylim((0, max(y) + 10))
         plt.xlabel("Time (s)")
         plt.ylabel("Flowrate (cm/s)")
@@ -1163,7 +1207,7 @@ def Text_from_greyscale(input_image_obj, COL):
     from scipy.ndimage import binary_dilation
 
     # 2. Apply slight Gaussian blur
-    smoothed_image = COL.filter(ImageFilter.GaussianBlur(radius=1))
+    #smoothed_image = COL.filter(ImageFilter.GaussianBlur(radius=1)) # In some cases smoothing helps, in others it makes it worse?
 
     for y in range(
         int(COL.size[1] * 0.45), COL.size[1]
@@ -1172,9 +1216,9 @@ def Text_from_greyscale(input_image_obj, COL):
             PIX[x, y] = (0, 0, 0)
 
 
-    pixels = np.array(smoothed_image)
+    pixels = COL#np.array(smoothed_image)
     data = pytesseract.image_to_data(
-        pixels, output_type=Output.DICT, lang="eng", config="--psm 3 -c tessedit_char_blacklist=l!|$"
+        pixels, output_type=Output.DICT, lang="eng", config="--oem 1 --psm 3 -c tessedit_char_blacklist=l,!_|=$"
     )
     if (
         len(data["text"]) < 30
@@ -1199,36 +1243,145 @@ def Text_from_greyscale(input_image_obj, COL):
         else:
             y_center[i] = 0
         
-
-    def group_similar_numbers(array, tolerance, words):
+    def group_similar_numbers(y_center, tolerance, OCR_data):
         # This function groups indexes of words with similar y-coordinate center
-        # Assuming that this is an indicator of words being part of the same line
-        # Prepare the data for clustering
-        data = np.array(array).reshape(-1, 1)
+        # and also calculates the bounding box for each group of words
+        words = OCR_data["text"]
+        lefts = OCR_data["left"]
+        tops = OCR_data["top"]
+        widths = OCR_data["width"]
+        heights = OCR_data["height"]
+        x_centers = [left + width / 2 for left, width in zip(lefts, widths)] # Calculate x_center for sorting
 
-        # Perform DBSCAN clustering
+        # Convert y_center to a numpy array and reshape for DBSCAN
+        data = np.array(y_center).reshape(-1, 1)
+
+        # Perform DBSCAN clustering on y-coordinates
         dbscan = DBSCAN(eps=tolerance, min_samples=2)
         labels = dbscan.fit_predict(data)
 
         # Group the indices based on the cluster labels
         groups = {}
         for i, label in enumerate(labels):
-            if label in groups:
-                groups[label].append(i)
-            else:
-                groups[label] = [i]
+            if label not in groups:
+                groups[label] = []
+            groups[label].append(i)
 
-        # Add the words together for each group to make each line of text
+        # Group the words and calculate bounding boxes for each group
         grouped_words = []
-        for group in groups.values():
-            group_words = [words[idx] for idx in group]
+        bounding_boxes = []
+        for group_indices in groups.values():
+            # Sort the indices within the group based on the 'x_center' value
+            sorted_indices = sorted(group_indices, key=lambda idx: x_centers[idx])
+
+            # Extract the sorted words based on the sorted indices
+            group_words = [words[idx] for idx in sorted_indices]
             grouped_words.append(' '.join(group_words))
 
-        return grouped_words
+            # Calculate the bounding box for the current group
+            group_lefts = [lefts[idx] for idx in sorted_indices]
+            group_tops = [tops[idx] for idx in sorted_indices]
+            group_rights = [lefts[idx] + widths[idx] for idx in sorted_indices]
+            group_bottoms = [tops[idx] + heights[idx] for idx in sorted_indices]
+
+            bounding_box = {
+                'top_left': (min(group_lefts), min(group_tops)),
+                'bottom_right': (max(group_rights), max(group_bottoms))
+            }
+            bounding_boxes.append(bounding_box)
+
+        return grouped_words, bounding_boxes
+
+
 
     tolerance = 5  # Adjust the tolerance value - the max difference between y-coords considered on the same line
-    grouped_words = group_similar_numbers(y_center, tolerance, data["text"])
+    grouped_words, bounding_boxes = group_similar_numbers(y_center, tolerance, data)
 
+    # The bounding box is expected in the form of (left, upper, right, lower)
+    left, top = bounding_boxes[1]['top_left']
+    right, bottom = bounding_boxes[1]['bottom_right']
+    crop_box = (left - 1, top -1, right + 1, bottom - 1)
+    cropped_image = COL.crop(crop_box)
+    
+    # def increase_dpi(image, factor=2):
+    #     """Increases the DPI of an image by a factor
+
+    #     Args:
+    #         image (ndarray) : A 2D numpy array of the image.
+    #         factor (int, optional) : The factor to increase the DPI by.
+
+    #     Returns:
+    #         col_image (ndarry) : A 2D numpy array of the image with increased DPI.
+    #     """
+
+    #     # Increases the number of rows
+    #     row_image = np.zeros((image.shape[0] * factor, image.shape[1]))
+    #     for i in range(image.shape[0]):
+    #         new_rows = np.arange(i * factor, (i + 1) * factor)
+    #         row_image[new_rows, :] = image[i, :]
+
+    #     # Increases the number of cols
+    #     col_image = np.zeros((row_image.shape[0], row_image.shape[1] * factor))
+    #     for j in range(row_image.shape[1]):
+    #         new_cols = np.arange(j * factor, (j + 1) * factor)
+    #         col_image[:, new_cols] = row_image[:, j][..., None]
+
+    #     return col_image
+
+    # from skimage import filters, morphology
+
+    # # Assuming 'increase_dpi' is a function you have defined to increase the DPI of the image
+    # image_dpi = increase_dpi(np.array(cropped_image)[:,:,0], factor=4)
+
+    # # Apply a Gaussian filter
+    # image_gaussian = filters.gaussian(image_dpi, sigma=2)
+
+    # image_final = image_gaussian
+    # # # Perform the dilation
+    # # # Create a structuring element, you can choose different shapes and sizes
+    # # selem = morphology.disk(1)  # This creates a disk-shaped structuring element with radius 1
+
+    # # # Apply the dilation
+    # # image_dilated = morphology.dilation(image_gaussian, selem)
+
+    # # # Convert the dilated image back to the original shape with the required number of channels
+    # # image_final = np.zeros((image_dilated.shape[0], image_dilated.shape[1], np.array(cropped_image).shape[2]))
+
+    # # # Add the dilated image back into each channel
+    # # for i in range(np.array(cropped_image).shape[2]):
+    # #     image_final[:, :, i] = image_dilated
+
+    # # Convert to unsigned 8-bit integer type if necessary
+    # image_final = image_final.astype(np.uint8)
+
+    # # Performs binarisation of image
+    # threshold = np.max(image_final) / 4
+    # image_bin = np.zeros(image_final.shape)
+    # image_bin[image_final < threshold] = 255
+    # image_final = np.copy(image_bin.astype(np.uint8))
+
+    # data2 = pytesseract.image_to_data(
+    #     cropped_image, output_type=Output.DICT, lang="eng", config="--oem 1 --psm 7 -c tessedit_char_blacklist=l!~>»oOe¢_|=$"
+    # )
+
+    # # Loop through each word and draw a box around it
+    # y_center = np.zeros(len(data2["text"])) # Variable to store the y-center of each bounding box of text detected.
+    # for i in range(len(data2["text"])):
+    #     if data2["text"][i] != '' and data2["text"][i] != ' ':
+    #         x = data2["left"][i]
+    #         y = data2["top"][i]
+    #         w = data2["width"][i]
+    #         h = data2["height"][i]
+    #         if int(data2["conf"][i]) > -1:
+    #             #cv2.rectangle(img, (x, y), (x + w, y + h), (0, 0, 255), 2)
+    #             y_center[i] = y + (h/2)
+    #         else:
+    #             y_center[i] = 0  
+    #     else:
+    #         y_center[i] = 0
+
+    # tolerance = 5  # Adjust the tolerance value - the max difference between y-coords considered on the same line
+    # grouped_words, bounding_boxes = group_similar_numbers(y_center, 20, data2)
     # Display image
     plt.imshow(img)
 
@@ -1258,6 +1411,16 @@ def Text_from_greyscale(input_image_obj, COL):
         "Umb-MD",
         "Umb-TAmax",
         "Umb-HR",
+        "DV-S",
+        "DV-D",
+        "DV-a",
+        "DV-TAmax",
+        "DV-S/a",
+        "DV-a/S",
+        "DV-PI",
+        "DV-PLI",
+        "DV-PVIV",
+        "DV-HR",
     ]
     
     # Split text into lines
@@ -1265,14 +1428,14 @@ def Text_from_greyscale(input_image_obj, COL):
     # Initialize DataFrame
     df = pd.DataFrame(columns=["Line", "Word", "Value", "Unit"])
 
-    prefixes = ["Lt", "Rt", "Umb"]
+    prefixes = ["Lt", "Rt", "Umb", "DV"]
     prefix_counts = {prefix: sum(1 for line in lines if prefix in line) for prefix in prefixes}
     most_likely_prefix = max(prefix_counts, key=prefix_counts.get)
 
     # Filter target words based on the most likely prefix
     target_words = [word for word in target_words if word.startswith(most_likely_prefix)]
     word_order = [word for word in target_words if word.startswith(most_likely_prefix)]
-
+    target_word_mem = target_words.copy()
     # Step 1: Exact matching
     matched_lines = set()  # to store the indices of lines that have been matched
 
@@ -1376,21 +1539,91 @@ def Text_from_greyscale(input_image_obj, COL):
                     target_words.remove(closest_word) 
                 matched_lines.add(i)
 
-    import Levenshtein
+    from Levenshtein import distance
+
+    target_words_extended = [
+        "Lt Ut-PS cm/s",
+        "Lt Ut-ED cm/s",
+        "Lt Ut-S/D",
+        "Lt Ut-PI",
+        "Lt Ut-RI",
+        "Lt Ut-MD cm/s",
+        "Lt Ut-TAmax cm/s",
+        "Lt Ut-HR bpm",
+        "Rt Ut-PS cm/s",
+        "Rt Ut-ED cm/s",
+        "Rt Ut-S/D",
+        "Rt Ut-PI",
+        "Rt Ut-RI",
+        "Rt Ut-MD cm/s",
+        "Rt Ut-TAmax cm/s",
+        "Rt Ut-HR bpm",
+        "Umb-PS cm/s",
+        "Umb-ED cm/s",
+        "Umb-S/D",
+        "Umb-PI",
+        "Umb-RI",
+        "Umb-MD cm/s",
+        "Umb-TAmax cm/s",
+        "Umb-HR bpm",
+        "DV-S cm/s",
+        "DV-D cm/s",
+        "DV-a",
+        "DV-TAmax cm/s",
+        "DV-S/a",
+        "DV-a/S",
+        "DV-PI",
+        "DV-PLI",
+        "DV-PVIV",
+        "DV-HR bpm",
+    ]
+
 
     if target_words:
+
+        suffixes = [word.split('-')[-1] for word in target_words if '-' in word]
+        indices = [i for i, entry in enumerate(target_words_extended) if any(sub in entry for sub in target_words)]
+        remaining_target_extended = [target_words_extended[i] for i in indices]
+
         # Create a distance matrix
         num_lines = len(lines)
-        num_target_words = len(target_words)
+        num_target_words = len(remaining_target_extended)
         distance_matrix = np.zeros((num_lines, num_target_words))
 
+        # Bias values - these need to be defined by you, for example:
+        # Create a list of bias values, all set to -2, with the same length as suffixes
+        bias_values = [-2] * len(suffixes)  # Creates a list with -2 repeated len(suffixes) times
+
+
+        # Bias dictionary, where the keys are suffixes and the values are the bias amounts
+        bias_dict = {suffix: bias for suffix, bias in zip(suffixes, bias_values)}
+
+        # Initialize your distance matrix
+        num_lines = len(lines)
+        num_target_words = len(remaining_target_extended)
+        distance_matrix = np.zeros((num_lines, num_target_words))
+
+        # Calculate biased distances
         for i, line in enumerate(lines):
             if i not in matched_lines:
-                for j, word in enumerate(target_words):
-                    distance_matrix[i, j] = Levenshtein.distance(line, word)
+                for j, word in enumerate(remaining_target_extended):
+                    # Remove digits from the line
+                    line_no_digits = re.sub(r'\d+', '', line)
+                    
+                    # Calculate basic Levenshtein distance
+                    basic_distance = distance(line_no_digits, word)
+                    
+                    # Apply bias if a specific suffix is expected in the line
+                    expected_suffix = suffixes[j]  # Suffix that corresponds to the current target word
+                    if expected_suffix in line:
+                        # Subtract bias to reduce distance
+                        basic_distance += bias_dict[expected_suffix]
+                    
+                    # Set the biased distance in the matrix
+                    distance_matrix[i, j] = basic_distance
 
         matches = {}
-        for j, word in enumerate(target_words):
+        for j, word in enumerate(remaining_target_extended):
             # Find the line with the smallest non-zero distance for the current target word
             line_indices_with_non_zero_distances = np.where(distance_matrix[:, j] > 0)[0]
             if len(line_indices_with_non_zero_distances) > 0:
@@ -1405,12 +1638,12 @@ def Text_from_greyscale(input_image_obj, COL):
                     value = float(match.group(1).replace(' ', ''))
                     unit = match.group(4) if match.group(4) else ""
                     df = df._append(
-                        {"Line": i + 1, "Word": word, "Value": value, "Unit": unit},
+                        {"Line": i + 1, "Word": target_words[j], "Value": value, "Unit": unit},
                         ignore_index=True,
                     )
                 else:
                     df = df._append(
-                        {"Line": i + 1, "Word": word, "Value": 0, "Unit": 0},
+                        {"Line": i + 1, "Word": target_words[j], "Value": 0, "Unit": 0},
                         ignore_index=True,
                     )
                 matched_lines.add(i)
@@ -1423,7 +1656,27 @@ def Text_from_greyscale(input_image_obj, COL):
     df = pd.concat([df.loc[df['Word'] == word] for word in word_order]).reset_index(drop=True)
 
     try: # This is still a test really
-        df = Metric_check(df)
+        if most_likely_prefix == "DV":
+
+            if df.loc[df['Word'] == 'DV-D', 'Value'].values[0] > df.loc[df['Word'] == 'DV-S', 'Value'].values[0] and df.loc[df['Word'] == 'DV-S/a', 'Value'].values[0] > df.loc[df['Word'] == 'DV-S', 'Value'].values[0] and df.loc[df['Word'] == 'DV-S/a', 'Unit'].values[0] != '':
+                # Storing temporary values for swapping
+                temp = df.loc[df['Word'] == 'DV-S/a', 'Value'].values[0]
+                df.loc[df['Word'] == 'DV-S/a', 'Value'] = df.loc[df['Word'] == 'DV-S', 'Value'].values[0]
+                df.loc[df['Word'] == 'DV-S', 'Value'] = temp
+                print("swapped DV-S/a and DV-S")
+            
+            if df.loc[df['Word'] == 'DV-a/S', 'Unit'].values[0] != '' and df.loc[df['Word'] == 'DV-a', 'Unit'].values[0] == '':
+                # Storing temporary values for swapping
+                temp = df.loc[df['Word'] == 'DV-a/S', 'Value'].values[0]
+                temp_unit = df.loc[df['Word'] == 'DV-a/S', 'Unit'].values[0]
+                df.loc[df['Word'] == 'DV-a/S', 'Value'] = df.loc[df['Word'] == 'DV-a', 'Value'].values[0]
+                df.loc[df['Word'] == 'DV-a/S', 'Unit'] = df.loc[df['Word'] == 'DV-a', 'Unit'].values[0]
+                df.loc[df['Word'] == 'DV-a', 'Value'] = temp
+                df.loc[df['Word'] == 'DV-a', 'Unit'] = temp_unit
+            
+            df  = Metric_check_DV(df) # handle the ductus venousus differently
+        else:
+            df = Metric_check(df) # for left, right, and umbilical
     except:
         print("metric check failed")
 
@@ -1447,32 +1700,32 @@ def Metric_check(df):
                 print("prefix found")
                 PRF = prefix
                     
-        target_words = [
-            "Lt Ut-PS",
-            "Lt Ut-ED",
-            "Lt Ut-S/D",
-            "Lt Ut-PI",
-            "Lt Ut-RI",
-            "Lt Ut-MD",
-            "Lt Ut-TAmax",
-            "Lt Ut-HR",
-            "Rt Ut-PS",
-            "Rt Ut-ED",
-            "Rt Ut-S/D",
-            "Rt Ut-PI",
-            "Rt Ut-RI",
-            "Rt Ut-MD",
-            "Rt Ut-TAmax",
-            "Rt Ut-HR",
-            "Umb-PS",
-            "Umb-ED",
-            "Umb-S/D",
-            "Umb-PI",
-            "Umb-RI",
-            "Umb-MD",
-            "Umb-TAmax",
-            "Umb-HR",
-        ]
+            target_words = [
+                "Lt Ut-PS",
+                "Lt Ut-ED",
+                "Lt Ut-S/D",
+                "Lt Ut-PI",
+                "Lt Ut-RI",
+                "Lt Ut-MD",
+                "Lt Ut-TAmax",
+                "Lt Ut-HR",
+                "Rt Ut-PS",
+                "Rt Ut-ED",
+                "Rt Ut-S/D",
+                "Rt Ut-PI",
+                "Rt Ut-RI",
+                "Rt Ut-MD",
+                "Rt Ut-TAmax",
+                "Rt Ut-HR",
+                "Umb-PS",
+                "Umb-ED",
+                "Umb-S/D",
+                "Umb-PI",
+                "Umb-RI",
+                "Umb-MD",
+                "Umb-TAmax",
+                "Umb-HR",
+            ]
         # Splitting the target words based on prefixes
         target_words = [word for word in target_words if word.startswith(PRF)]
 
@@ -1511,15 +1764,67 @@ def Metric_check(df):
 
         # If the value is outside of these ranges, return a default or handle accordingly
         return value  # or return some default value or raise an exception
+    
+    def check_TAmax_value(value,df): # Decimal can be misread, so common sense check.
 
-    # Example usage:
+        MD = df.loc[df['Word'].str.contains('MD'), 'Value'].values[0] if df['Word'].str.contains('MD').any() else 0
+        PS = df.loc[df['Word'].str.contains('PS'), 'Value'].values[0] if df['Word'].str.contains('PS').any() else 0
+        ED = df.loc[df['Word'].str.contains('ED'), 'Value'].values[0] if df['Word'].str.contains('ED').any() else 0 
+
+        # If the other values are positive, return the absolute value of TAmax
+        if value < 0 and MD > 0 and PS > 0 and ED > 0:
+            return abs(value)
+
+        return value  # or return some default value or raise an exception
+
+    # Sense check some values:
     PI = df.loc[df['Word'].str.contains('PI'), 'Value'].values[0] if df['Word'].str.contains('PI').any() else 0
     df.loc[df['Word'].str.contains('PI'), 'Value'] = check_PI_value(PI)
+    TAmax = df.loc[df['Word'].str.contains('TAmax'), 'Value'].values[0] if df['Word'].str.contains('TAmax').any() else 0
+    df.loc[df['Word'].str.contains('TAmax'), 'Value'] = check_TAmax_value(TAmax, df)
 
     # Peak systolic
     PS = df.loc[df['Word'].str.contains('PS'), 'Value'].values[0] if df['Word'].str.contains('PS').any() else 0
     # End diastolic
     ED = df.loc[df['Word'].str.contains('ED'), 'Value'].values[0] if df['Word'].str.contains('ED').any() else 0
+
+    def check_TAmax_value(PS, ED, df):  # Decimal can be misread, so common sense check.
+
+        TAmax = df.loc[df['Word'].str.contains('TAmax'), 'Value'].values[0] if df['Word'].str.contains('TAmax').any() else 0
+        MD = df.loc[df['Word'].str.contains('MD'), 'Value'].values[0] if df['Word'].str.contains('MD').any() else 0
+
+        # Check if there's a difference in sign between PS and ED
+        if (PS > 0 and ED < 0) or (PS < 0 and ED > 0):
+            # Check if TAmax and MD have the same sign
+            if (TAmax > 0 and MD > 0) or (TAmax < 0 and MD < 0):
+                # If so, change the sign of PS and ED to match that of TAmax and MD
+                PS = abs(PS) if TAmax > 0 else -abs(PS)
+                ED = abs(ED) if TAmax > 0 else -abs(ED)
+
+        PSnew = PS
+        EDnew = ED
+        # If the value is between 3 and 10, divide it by 10
+        if 250 <= PS <= 1000:
+            PSnew = PS/ 10
+
+        # If the value is between 10 and 200, divide it by 100
+        if 1000 <= PS <= 10000:
+            PSnew = PS/ 100
+        
+        # If the value is between 3 and 10, divide it by 10
+        if 200 <= ED <= 1000:
+            EDnew = ED/ 10
+
+        # If the value is between 10 and 200, divide it by 100
+        if 1000 <= ED <= 10000:
+            EDnew = ED/ 100
+
+
+        return PSnew, EDnew
+
+    PS, ED = check_TAmax_value(PS, ED, df) # sense check for pressures
+    df.loc[df['Word'].str.contains('PS'), 'Value'] = PS
+    df.loc[df['Word'].str.contains('ED'), 'Value'] = ED
 
     # Find S/D
     SoverD_calc = PS / ED
@@ -1566,7 +1871,7 @@ def Metric_check(df):
 
         # Tolerance level (you can adjust this based on your requirements)
         tolerance1 = 0.2
-        tolerance2 = 2 # This tolerance is larger because the equation we used for TAmax is approximate
+        tolerance2 = 4 # This tolerance is larger because the equation we used for TAmax is approximate
         conditions_met = []
         for parameter, extracted_name in [('SoverD', 'SoverD_extracted'), ('RI', 'RI_extracted'), ('TAmax', 'TAmax_extracted')]:
             extracted_value = c_df['Extracted'][extracted_name]
@@ -1612,7 +1917,9 @@ def Metric_check(df):
 
             # Check conditions met with these values:
             conditions_met = Metric_comparison(comparison_dataframe,2)
-            if len(conditions_met) == 0: # If our assumption above was wrong
+
+
+            if len(conditions_met) == 0 or (ED_from_RI<2 and ED_from_SoverD<2): # If our assumption above was wrong
                 # Recalculate PS using the extracted metrics and assumed correct ED
                 PS_from_SoverD = SoverD_extracted * ED if SoverD_extracted else None
                 PS_from_RI = ED / (1 - RI_extracted) if RI_extracted else None
@@ -1645,7 +1952,7 @@ def Metric_check(df):
                     new_value = comparison_dataframe.loc[desired_row_name, 'Third_calc'] 
                     # We have calculated the new PS!
                     print(f"Recalculated PS (from RI): {new_value}")
-                    df.loc[df['Word'].str.contains('PS'), 'Value'] = new_value
+                    df.loc[df['Word'].str.contains('PS'), 'Value'] = round(new_value,2)
                     PS = df.loc[df['Word'].str.contains('PS'), 'Value'].values[0]
                     ED = df.loc[df['Word'].str.contains('ED'), 'Value'].values[0]
                     # Find S/D
@@ -1664,7 +1971,7 @@ def Metric_check(df):
                     new_value = comparison_dataframe.loc[desired_row_name, 'Second_calc'] 
                     # We have calculated the new PS!
                     print(f"Recalculated PS (from RI): {new_value}")
-                    df.loc[df['Word'].str.contains('ED'), 'Value'] = new_value
+                    df.loc[df['Word'].str.contains('ED'), 'Value'] = round(new_value,2)
                     PS = df.loc[df['Word'].str.contains('PS'), 'Value'].values[0]
                     ED = df.loc[df['Word'].str.contains('ED'), 'Value'].values[0]
                     # Find S/D
@@ -1699,6 +2006,350 @@ def Metric_check(df):
 
     return df
 
+def upscale_both_images(PIL_img, cv2_img, max_length=950, min_length=950):
+    """
+    Upscale both a PIL and an OpenCV image, maintaining their aspect ratios.
+
+    :param PIL_img: PIL Image object.
+    :param cv2_img: OpenCV Image object.
+    :param max_length: The maximum length of the longest edge of the image.
+    :param min_length: The minimum length for upscaling.
+    :return: Tuple containing the upscaled PIL Image and OpenCV Image.
+    """
+
+    def upscale_image(image, is_pil):
+        # Get original dimensions
+        if is_pil:
+            original_width, original_height = image.size
+        else:  # OpenCV image
+            original_height, original_width = image.shape[:2]
+
+        # Check if the longest edge is already greater than or equal to min_length
+        if max(original_width, original_height) >= min_length:
+            return image
+
+        # Determine the scaling factor
+        scaling_factor = max_length / max(original_width, original_height)
+
+        # Calculate the new size
+        new_width = int(original_width * scaling_factor)
+        new_height = int(original_height * scaling_factor)
+
+        # Resize the image
+        if is_pil:
+            return image.resize((new_width, new_height), Image.LANCZOS)
+        else:  # OpenCV image
+            return cv2.resize(image, (new_width, new_height), interpolation=cv2.INTER_CUBIC)
+
+    # Upscale both images
+    upscaled_PIL_img = upscale_image(PIL_img, is_pil=True)
+    upscaled_cv2_img = upscale_image(cv2_img, is_pil=False)
+
+    return upscaled_PIL_img, upscaled_cv2_img
+
+def Metric_check_DV(df):
+    """
+	Function to check dataframe values through comparison with their calculations
+
+	Args:
+		df (DataFrame): Extracted data from image
+
+	Returns:
+		df(DataFrame): DataFrame with corrected values after metric checking calculations
+	"""
+
+    # Splitting the target words based on prefixes
+
+    def add_missing_rows(df):
+        # Identify the Prefix
+        prefix = "DV"
+
+        target_words = ["DV-S",
+        "DV-D",
+        "DV-a",
+        "DV-TAmax",
+        "DV-S/a",
+        "DV-a/S",
+        "DV-PI",
+        "DV-PLI",
+        "DV-PVIV",
+        "DV-HR",]
+        # Determine Missing Rows
+        existing_words = df['Word'].tolist()
+        missing_targets = [word for word in target_words if word not in existing_words]
+        
+        # Add Missing Rows
+        for target in missing_targets:
+            new_row = {"Word": target, "Value": 0, "Unit": ""}
+            df = df._append(new_row, ignore_index=True)
+        
+        return df
+
+    df = add_missing_rows(df)
+
+
+    def check_PI_value(value): # Decimal can be misread, so common sense check.
+        # If the value is between 0 and 2, return it as is
+        if 0 <= value <= 3:
+            return value
+
+        # If the value is between 3 and 10, divide it by 10
+        if 3 <= value <= 10:
+            return value / 10
+
+        # If the value is between 10 and 200, divide it by 100
+        if 10 <= value <= 200:
+            return value / 100
+
+        # If the value is outside of these ranges, return a default or handle accordingly
+        return value  # or return some default value or raise an exception
+    
+    def check_TAmax_value(value,df): # Decimal can be misread, so common sense check.
+
+        PLI = df.loc[df['Word'] == 'DV-S/a', 'Value'].values[0]
+        PS = df.loc[df['Word'] == 'DV-S', 'Value'].values[0]
+        ED = df.loc[df['Word'] == 'DV-D', 'Value'].values[0]
+
+        # If the other values are positive, return the absolute value of TAmax
+        if value < 0 and PLI > 0 and PS > 0 and ED > 0:
+            return abs(value)
+
+        return value  # or return some default value or raise an exception
+
+    # Sense check some values:
+    PI = df.loc[df['Word'] == 'DV-PI', 'Value'].values[0]
+    df.loc[df['Word'] == 'DV-PI', 'Value'] = check_PI_value(PI)
+    TAmax = df.loc[df['Word'] == 'DV-TAmax', 'Value'].values[0]
+    df.loc[df['Word'] == 'DV-TAmax', 'Value'] = check_TAmax_value(TAmax, df)
+
+    # Peak systolic
+    PS = df.loc[df['Word'] == 'DV-S', 'Value'].values[0]
+    # End diastolic
+    ED = df.loc[df['Word'] == 'DV-D', 'Value'].values[0]
+
+    def check_TAmax_value(PS, ED, df):  # Decimal can be misread, so common sense check.
+
+        TAmax = df.loc[df['Word'] == 'DV-TAmax', 'Value'].values[0]
+        a = df.loc[df['Word'] == 'DV-a', 'Value'].values[0]
+
+        # Check if there's a difference in sign between PS and ED
+        if (PS > 0 and ED < 0) or (PS < 0 and ED > 0):
+            # Check if TAmax and MD have the same sign
+            if (TAmax > 0 and a > 0) or (TAmax < 0 and a < 0):
+                # If so, change the sign of PS and ED to match that of TAmax and MD
+                PS = abs(PS) if TAmax > 0 else -abs(PS)
+                ED = abs(ED) if TAmax > 0 else -abs(ED)
+
+        return PS, ED
+
+    PS, ED = check_TAmax_value(PS, ED, df) # sense check for pressures
+
+    def check_S_D_value(value): # Decimal can be misread, so common sense check.
+        # If the value is between 0 and 2, return it as is
+        if 0 <= abs(value) <= 60:
+            return value
+
+        # If the value is between 3 and 10, divide it by 10
+        if 60 <= abs(value) <= 600:
+            return value / 10
+
+        # If the value is between 10 and 200, divide it by 100
+        if 600 <= abs(value):
+            return value / 100
+
+        # If the value is outside of these ranges, return a default or handle accordingly
+        return value  # or return some default value or raise an exception
+    
+    ED = check_S_D_value(ED)
+    df.loc[df['Word'] == 'DV-S', 'Value'] = PS
+    df.loc[df['Word'] == 'DV-D', 'Value'] = ED
+    a = df.loc[df['Word'] == 'DV-a', 'Value'].values[0]
+
+    # Find S/D
+    Sovera_calc = PS / a
+    # Find RI
+    aoverS_calc = a / PS
+    # Find TAmax
+    TAmax_calc = (PS + (2 * a)) / 3
+    # Find PI
+    PI_calc = (PS - a) / ((PS + a)/2)
+
+    # Now check whether the PS & a dependant metrics are consistent between calculated and extracted:
+    # Extracted values with default as None if not present
+    Sovera_extracted = df.loc[df['Word'] == 'DV-S/a', 'Value'].values[0]
+    aoverS_extracted = df.loc[df['Word'] == 'DV-a/S', 'Value'].values[0]
+    TAmax_extracted = df.loc[df['Word'] == 'DV-TAmax', 'Value'].values[0]
+    PI_extracted = df.loc[df['Word'] == 'DV-PI', 'Value'].values[0]
+    comparison_dataframe = pd.DataFrame(index=['PS_extracted','a_extracted','Sovera_extracted','TAmax_extracted', 'PI_extracted',
+                                               'Sovera_calc','PI_calc','TAmax_calc','PS_calc','a_calc','a_from_Sovera','a_from_PI',
+                                               'Sovera_from_a_from_PI','PI_from_a_from_Sovera','TAmax_from_a_from_Sovera','TAmax_from_a_from_PI',
+                                               'PS_from_Sovera','PS_from_PI','Sovera_from_PS_from_PI','PI_from_PS_from_Sovera','TAmax_from_PS_from_Sovera',
+                                               'TAmax_from_PS_from_PI'], columns=['Extracted'])
+    # List of all the extracted metrics that exist
+    existing_metrics = [metric for metric in [Sovera_extracted, PI_extracted, TAmax_extracted] if metric is not None]
+    values_to_insert = {
+        'PS_extracted': PS,
+        'a_extracted': a,
+        'Sovera_extracted': Sovera_extracted,
+        'PI_extracted': PI_extracted,
+        'TAmax_extracted': TAmax_extracted
+    }
+
+    for key, value in values_to_insert.items():
+        comparison_dataframe.loc[key, 'Extracted'] = value
+        # Check closeness and store conditions met in a list
+
+    values_to_insert = {
+        'Sovera_calc': Sovera_calc,
+        'PI_calc': PI_calc,
+        'TAmax_calc': TAmax_calc
+    }
+    for key, value in values_to_insert.items():
+        comparison_dataframe.loc[key, 'First_calc'] = value
+        # Check closeness and store conditions met in a list
+
+
+    def Metric_comparison(c_df,col):
+
+        # Tolerance level (you can adjust this based on your requirements)
+        tolerance1 = 0.2
+        tolerance2 = 2 # This tolerance is larger because the equation we used for TAmax is approximate
+        conditions_met = []
+        for parameter, extracted_name in [('Sovera', 'Sovera_extracted'), ('PI', 'PI_extracted'), ('TAmax', 'TAmax_extracted')]:
+            extracted_value = c_df['Extracted'][extracted_name]
+            
+            if extracted_value is not None:
+                for row_name, calc_value in c_df.iloc[:, col].items():
+                    if str(row_name).startswith(extracted_name[:-9]) and np.isnan(calc_value) != True:  # If row name starts with the parameter name
+                        tolerance = tolerance1 if parameter != 'TAmax' else tolerance2
+                        if abs(calc_value - extracted_value) < tolerance:
+                            conditions_met.append(row_name)
+                            break  # Exit the inner loop once a match is found
+
+        return conditions_met
+
+    try:
+        conditions_met = Metric_comparison(comparison_dataframe,1)
+        print("ok")
+    except:
+        traceback.print_exc()
+
+    # You've already extracted PS, Sovera_extracted, RI_extracted, and TAmax_extracted
+
+    # Check if all 3 metrics are inconsistent
+    if len(conditions_met) == 0:  # All 3 are not consistent
+        # Assume PS was extracted correctly, compute a from the 3 metrics:
+        try:
+            # Recalculate a using extracted metrics and assumed correct PS
+            a_from_Sovera = PS / Sovera_extracted if Sovera_extracted else None
+            a_from_PI = PS * (1 - PI_extracted) if PI_extracted else None
+            # Now, using these new a values, recalculate the metrics
+            Sovera_from_a_from_PI = PS / a_from_PI if a_from_PI else None
+            PI_from_a_from_Sovera = (PS - a_from_Sovera) / ((PS + a_from_Sovera)/2) if a_from_Sovera else None 
+            TAmax_from_a_from_Sovera = (PS + (2 * a_from_Sovera)) / 3 if a_from_Sovera else None
+            TAmax_from_a_from_PI = (PS + (2 * a_from_PI)) / 3 if a_from_PI else None
+
+            values_to_insert = {
+                'a_from_Sovera': a_from_Sovera,
+                'a_from_PI': a_from_PI,
+                'Sovera_from_a_from_PI': Sovera_from_a_from_PI,
+                'PI_from_a_from_Sovera': PI_from_a_from_Sovera,
+                'TAmax_from_a_from_Sovera': TAmax_from_a_from_Sovera,
+                'TAmax_from_a_from_PI': TAmax_from_a_from_PI
+            }
+            for key, value in values_to_insert.items():
+                comparison_dataframe.loc[key, 'Second_calc'] = value
+                # Check closeness and store conditions met in a list
+
+            # Check conditions met with these values:
+            conditions_met = Metric_comparison(comparison_dataframe,2)
+            if len(conditions_met) == 0: # If our assumption above was wrong
+                # Recalculate PS using the extracted metrics and assumed correct a
+                PS_from_Sovera = Sovera_extracted * a if Sovera_extracted else None
+                PS_from_PI = ((3*PI_extracted)-(2*a)) if PI_extracted else None
+                # Now, using these new PS values, recalculate the other metrics
+                Sovera_from_PS_from_PI = PS_from_PI / a if PS_from_PI else None
+                PI_from_PS_from_Sovera = (PS_from_Sovera - a) / ((PS_from_Sovera + a)/2) if PS_from_Sovera else None
+                TAmax_from_PS_from_Sovera =  (PS_from_Sovera + (2 * a)) / 3 if PS_from_Sovera else None
+                TAmax_from_PS_from_PI = (PS_from_PI + (2 * a)) / 3 if PS_from_PI else None
+
+                values_to_insert = {
+                    'PS_from_Sovera': PS_from_Sovera,
+                    'PS_from_PI': PS_from_PI,
+                    'Sovera_from_PS_from_PI': Sovera_from_PS_from_PI,
+                    'PI_from_PS_from_Sovera': PI_from_PS_from_Sovera,
+                    'TAmax_from_PS_from_Sovera': TAmax_from_PS_from_Sovera,
+                    'TAmax_from_PS_from_PI': TAmax_from_PS_from_PI
+                }
+                for key, value in values_to_insert.items():
+                    comparison_dataframe.loc[key, 'Third_calc'] = value
+                    # Check closeness and store conditions met in a list
+
+                conditions_met = Metric_comparison(comparison_dataframe,3)
+                # now check the conditions again:
+                if len(conditions_met)>0:
+
+                    row_name = conditions_met[0]
+
+                    parts = row_name.split('_from_')
+                    desired_row_name = parts[1] + '_from_' + parts[2]
+                    new_value = comparison_dataframe.loc[desired_row_name, 'Third_calc'] 
+                    # We have calculated the new PS!
+                    print(f"Recalculated PS (from PI): {new_value}")
+                    df.loc[df['Word'] == 'DV-S', 'Value'] = new_value
+                    PS = df.loc[df['Word'] == 'DV-S', 'Value'].values[0]
+                    a = df.loc[df['Word'] == 'DV-a', 'Value'].values[0]
+                    # Find S/D
+                    df.loc[df['Word'] == 'DV-S/a', 'Value'] =  round(PS / a,2)
+                    # Find PI
+                    df.loc[df['Word'] == 'DV-PI', 'Value'] = round((PS - a) / ((PS + a)/2),2)
+                    # Find TAmax
+                    df.loc[df['Word'] == 'DV-TAmax', 'Value'] = round((PS + (2 * a)) / 3,2)
+
+            elif len(conditions_met)>0:
+
+                row_name = conditions_met[0]
+
+                parts = row_name.split('_from_')
+                desired_row_name = parts[1] + '_from_' + parts[2]
+                new_value = comparison_dataframe.loc[desired_row_name, 'Second_calc'] 
+                # We have calculated the new PS!
+                print(f"Recalculated PS (from PI): {new_value}")
+                df.loc[df['Word'] == 'DV-a', 'Value'] = round(new_value,2)
+                PS = df.loc[df['Word'] == 'DV-S', 'Value'].values[0]
+                a = df.loc[df['Word'] == 'DV-a', 'Value'].values[0]
+                # Find S/D
+                df.loc[df['Word'] == 'DV-S/a', 'Value'] =  round(PS / a,2)
+                # Find PI
+                df.loc[df['Word'] == 'DV-PI', 'Value'] = round((PS - a) / ((PS + a)/2),2)
+                # Find TAmax
+                df.loc[df['Word'] == 'DV-TAmax', 'Value'] = round((PS + (2 * a)) / 3,2)
+
+
+        except ZeroDivisionError:
+            print("Error: Division by zero encountered. Check the extracted values.")
+    elif len(conditions_met) < 3:
+        # At least 1 of the metrics is consistent, therefore PS and a can be assumed to be correct,
+        # Caclulate the inconsistent metrics from the PS and a calculations
+        print("At least one text extraction error, correcting...")
+
+        if 'Sovera' not in conditions_met:
+            # Find S/a
+            df.loc[df['Word'] == 'DV-S/a', 'Value'] =  round(PS / a,2)
+            df.loc[df['Word'] == 'DV-a/S', 'Value'] =  round(a / PS,2)
+        if 'PI' not in conditions_met:
+            # Find PI
+            df.loc[df['Word'] == 'DV-PI', 'Value'] = round((PS - a) / ((PS + a)/2),2)
+        if 'TAmax' not in conditions_met:
+            # Find TAmax
+            df.loc[df['Word'] == 'DV-TAmax', 'Value'] = round((PS + (2 * a)) / 3,2)
+    else:
+        print("All metrics are consistent.")
+
+
+
+
+    return df
 
 
 
