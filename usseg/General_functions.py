@@ -29,25 +29,24 @@ from pytesseract import Output
 
 logger = logging.getLogger(__file__)
 
-class _HashableArray(np.ndarray):
-    def __new__(self, *args, **kwargs):
-        obj = np.asarray(*args, **kwargs).view(self)
-        return obj
-
-    def __eq__(self, other):
-        return hash(self) == hash(other)
-
-    def __hash__(self):
-        if self.size > 1:
-            return hash(tuple(self.view()))
-        return hash(self.view().item)
-
 import threading
 import tkinter as tk
 
 root = tk.Tk()  # Assuming you have a reference to the main tkinter window
 
 def execute_on_main_thread_and_wait(func, *args, **kwargs):
+    """Executes a function on the main thread and waits for it to complete.
+
+    This function is useful for ensuring that Tkinter objects are manipulated safely from worker threads. Tkinter objects are not thread-safe and can only be manipulated from the main thread.
+
+    Args:
+        func: The function to be executed on the main thread.
+        *args: The arguments to be passed to the function.
+        **kwargs: The keyword arguments to be passed to the function.
+
+    Returns:
+        The result of the function, or `None` if the function raised an exception."""
+    
     if threading.current_thread() == threading.main_thread():
         return func(*args, **kwargs)
     else:
@@ -73,17 +72,27 @@ def execute_on_main_thread_and_wait(func, *args, **kwargs):
         return result
 
 def Initial_segmentation(input_image_obj):
-    """Perform an initial corse segmentation of the waveform.
+    """
+    Initial segmentation of an ultrasound image.
+
+    The function performs an initial coarse segmentation on an RGB image to identify
+    a waveform by converting it to a binary mask, where the waveform is
+    represented by white pixels (1) and the background by black pixels (0).
+    It applies a thresholding algorithm to differentiate the waveform from
+    the background, with additional processing to remove noise, fill holes,
+    and adjust the shape of the segmented area. It also calculates the
+    bounding box coordinates of the waveform.
 
     Args:
-        input_image_filename (str) : Name of file within current directory, or path to a file.
+        input_image_filename (str): Name of file within current directory, or path to a file.
 
     Returns:
-        segmentation_mask (ndarray) : A binary array mask showing the corse segmentation of waveform (1) against background (0).
-        Xmin (float) : Minimum X coordinate of the segmentation.
-        Xmax (float) : Maximum X coordinate of the segmentation.
-        Ymin (float) : Minimum Y coordinate of the segmentation.
-        Ymax (float) : Maximum Y coordinate of the segmentation.
+        tuple: tuple containing:
+            - **segmentation_mask** (ndarray): A binary array mask showing the coarse segmentation of waveform (1) against background (0).
+            - **Xmin** (float): Minimum X coordinate of the segmentation.
+            - **Xmax** (float): Maximum X coordinate of the segmentation.
+            - **Ymin** (float): Minimum Y coordinate of the segmentation.
+            - **Ymax** (float): Maximum Y coordinate of the segmentation.
     """
     # img_RGBA = Image.open(input_image_filename)  # These images are in RGBA form
     img_RGB = input_image_obj
@@ -103,7 +112,7 @@ def Initial_segmentation(input_image_obj):
 
             # notice that the spread of values across R, G and B is reasonably small as the colours is a shade of white/grey,
             # It can be isolated by marking pixels with a low range (<50) and resonable brightness (sum or R G B components > 120)
-            if (rgb_range < 100 and max_rgb > 120):  # NEEDS REFINING - these values seem to be optimal for the cases i've tested.
+            if (rgb_range < 100 and max_rgb > 120):  # NEEDS REFINING - these values seem to be optimal for the majority tested.
                 pixel_data[x, y] = (
                     255,
                     255,
@@ -115,7 +124,7 @@ def Initial_segmentation(input_image_obj):
                 if y < 400:  # for some reason x==0 is white, this line negates this.
                     pixel_data[x, y] = (0, 0, 0)
             else:
-                if y < 20:  # for some reason x==0 is white, this line negates this.
+                if y < 20:  
                     pixel_data[x, y] = (0, 0, 0)
 
     binary_image = np.asarray(img_RGB)  # Make the image an nparray
@@ -161,18 +170,25 @@ def Initial_segmentation(input_image_obj):
 
 def Define_end_ROIs(segmentation_mask, Xmin, Xmax, Ymin, Ymax):
     """
-    Function to define regions adjacent to the corse waveform in which to search for axes info.
+    Defines regions of interest (ROIs) to the left and right of a segmented
+    waveform for the purpose of searching for axis information. These regions
+    are adjacent to the coarse waveform segmentation.
+
+    The function calculates the dimensions of the ROIs based on the given
+    segmentation boundaries. These dimensions are then used to identify and
+    analyze axis labels and tick marks related to the waveform data.
 
     Args:
         segmentation_mask (ndarray) : A binary array mask showing the corse segmentation of waveform (1) against background (0).
-        Xmin (float) : Minimum X coordinate of the segmentation.
-        Xmax (float) : Maximum X coordinate of the segmentation.
-        Ymin (float) : Minimum Y coordinate of the segmentation.
-        Ymax (float) : Maximum Y coordinate of the segmentation.
+        Xmin (float) : Minimum X coordinate of the corse segmentation.
+        Xmax (float) : Maximum X coordinate of the corse segmentation.
+        Ymin (float) : Minimum Y coordinate of the corse segmentation.
+        Ymax (float) : Maximum Y coordinate of the corse segmentation.
 
     Returns:
-        Left_dimensions (list) : edge points for the left axes ROI [Xmin, Xmax, Ymin, Ymax].
-        Right_dimensions (list) : edge points for the left axes ROI [Xmin, Xmax, Ymin, Ymax].
+        (tuple): tuple containing:
+            - **Left_dimensions** (list) : edge points for the left axes ROI [Xmin, Xmax, Ymin, Ymax].
+            - **Right_dimensions** (list) : edge points for the left axes ROI [Xmin, Xmax, Ymin, Ymax].
     """
 
     # For defining the specific ROI either side of the waveform data
@@ -217,7 +233,7 @@ def check_inverted_curve(top_curve_mask, Ymax, Ymin, tol=.25):
             Defaults to 0.45.
 
     Returns:
-        return value (bool) : True if the top curve is of an inverted waveform, False is the top curve is of a non-inverted waveform.
+        *return value* (bool) : True if the top curve is of an inverted waveform, False is the top curve is of a non-inverted waveform.
     """
     c_rows = np.where(np.sum(top_curve_mask, axis=1))   # Curve rows
     c_range = np.max(c_rows) - np.min(c_rows)           # Y range of top curve
@@ -225,18 +241,28 @@ def check_inverted_curve(top_curve_mask, Ymax, Ymin, tol=.25):
 
 def Segment_refinement(input_image_obj, Xmin, Xmax, Ymin, Ymax):
     """
-    Function to refine the waveform segmentation within the bounds of the corse waveform ROI.
+    Refines the segmentation of a waveform within specified bounds, improving 
+    the separation between the waveform and background. It processes a given 
+    image object within the region of interest (ROI) and generates masks 
+    for the waveform and its top curve.
 
     Args:
-        input_image_filename (str) : Name of file within current directory, or path to a file.
-        Xmin (float) : Minimum X coordinate of the segmentation in pixels.
-        Xmax (float) : Maximum X coordinate of the segmentation in pixels.
-        Ymin (float) : Minimum Y coordinate of the segmentation in pixels.
-        Ymax (float) : Maximum Y coordinate of the segmentation in pixels.
+        input_image_obj (ndarray): An image object, typically read from a file
+            using a library such as OpenCV.
+        Xmin (float): Minimum X coordinate of the segmentation in pixels, 
+            defining the left boundary of the ROI.
+        Xmax (float): Maximum X coordinate of the segmentation in pixels, 
+            defining the right boundary of the ROI.
+        Ymin (float): Minimum Y coordinate of the segmentation in pixels, 
+            defining the bottom boundary of the ROI.
+        Ymax (float): Maximum Y coordinate of the segmentation in pixels, 
+            defining the top boundary of the ROI.
+
     Returns:
-        refined_segmentation_mask (ndarray) :  A binary array mask showing the refined segmentation of waveform (1) against background (0).
-        top_curve_mask (ndarray) : A binary array showing a curve along the top of the refined waveform.
-    	top_curve_coords (ndarray) : A list of the coordinates for the top curve.
+        (tuple) : tuple containing:
+            - **refined_segmentation_mask** (ndarray): A binary array mask showing the refined segmentation of the waveform (value 1) against the background (value 0).
+            - **top_curve_mask** (ndarray): A binary array representing a curve along the top of the refined waveform segmentation.
+            - **top_curve_coords** (ndarray): An array of coordinates (row, column) for the top curve of the waveform.
     """
 
     # Refine segmentation to increase smoothing
@@ -313,7 +339,14 @@ def Segment_refinement(input_image_obj, Xmin, Xmax, Ymin, Ymax):
 
 def Search_for_ticks(input_image_obj, Side, Left_dimensions, Right_dimensions):
     """
-    Function to search for the ticks in either of the axes ROIs
+    Search for tick marks on either the left or right axis of an image.
+
+    This function locates contours that resemble tick marks by processing an
+    image. It converts the image to grayscale, applies thresholding to generate
+    a binary image, and identifies contours. The contours are then filtered
+    based on their geometric properties. It returns the contours, the region of
+    interest (ROI) of the axis, the center points of the ticks, and additional
+    details of the processing.
 
     Args:
         input_image_filename (str) : Name of file within current directory, or path to a file.
@@ -322,18 +355,19 @@ def Search_for_ticks(input_image_obj, Side, Left_dimensions, Right_dimensions):
         Right_dimensions (list) : edge points for the left axes ROI [Xmin, Xmax, Ymin, Ymax].
 
     Returns:
-        Cs (tuple) : list of contours for ticks found.
-        ROIAX (ndarray) : narray defining the ROI to search for the axes.
-        CenPoints (list) : center points for the ticks identified.
-        onY (list) : indexes of the contours which lie on the target x plane.
-        BCs (list) : Contours of the objects which lie on the target x plane.
-        TYLshift (intc) : shift in the x coordninate bounds - reducing the axes ROI in which to search for axes text.
-        thresholded_image (ndarray) : Threshold values iterated through.
-        Side (str) : Indicates the 'Left' or 'Right' axes.
-        Left_dimensions (list) : edge points for the left axes ROI [Xmin, Xmax, Ymin, Ymax].
-        Right_dimensions (list) : edge points for the left axes ROI [Xmin, Xmax, Ymin, Ymax].
-        ROI2
-        ROI3
+        (tuple) : tuple containing:
+            - **Cs** (tuple) : list of contours for ticks found.
+            - **ROIAX** (ndarray) : narray defining the ROI to search for the axes.
+            - **CenPoints** (list) : center points for the ticks identified.
+            - **onY** (list) : indexes of the contours which lie on the target x plane.
+            - **BCs** (list) : Contours of the objects which lie on the target x plane.
+            - **TYLshift** (intc) : shift in the x coordninate bounds - reducing the axes ROI in which to search for axes text.
+            - **thresholded_image** (ndarray) : Threshold values iterated through.
+            - **Side** (str) : Indicates the 'Left' or 'Right' axes.
+            - **Left_dimensions** (list) : edge points for the left axes ROI [Xmin, Xmax, Ymin, Ymax].
+            - **Right_dimensions** (list) : edge points for the left axes ROI [Xmin, Xmax, Ymin, Ymax].
+            - **ROI2** (ndarray) : Secondary ROI, stores contour detection data during tick search.
+            - **ROI3** (ndarray) : Axes ROI used for visualisation (not used - only initialised here).
     """
 
     image = input_image_obj
@@ -575,6 +609,42 @@ def Search_for_labels(
     ROI2,
     ROI3,
 ):
+    
+    """
+    Searches for labels within specified regions of an image, extracts text,
+    and attempts to associate it with the nearest tick marks.
+
+    This function iterates over a range of threshold values to optimize text
+    extraction from an image. It uses OpenCV for image processing and Pytesseract
+    for OCR to extract text. The text is then attempted to be matched to the
+    nearest tick marks based on center points. The function adapts to the side of
+    the image being analyzed (left or right) and draws rectangles around the
+    detected text. It also warns if characters are too close.
+
+    Args:
+        Cs (tuple): List of center points.
+        ROIAX (ndarray): Region of Interest (ROI) array for the X axis, modified
+        within the function.
+        CenPoints (list): List of center points for detected objects/ticks.
+        onY (list): 
+        BCs (list): List of baseline coordinates, likely for the tick marks.
+        TYLshift (int): Shift along the Y axis for thresholding, specific to the 
+        Left side.
+        Side (str): Side of the image being processed ('Left' or 'Right').
+        Left_dimensions (list): Dimensions for the left ROI.
+        Right_dimensions (list): Dimensions for the right ROI.
+        input_image_obj (ndarray): Image object to be processed.
+        ROI2 (ndarray): Secondary ROI, stores contour detection data during tick search.
+        ROI3 (ndarray): Axes ROI used for visualisation.
+
+    Returns:
+        (tuple): tuple containing:
+            - **ROIAX** (ndarray): narray defining the ROI to search for the axes.
+            - **number** (list): A list of label values found on axis.
+            - **positions** (list): A list of positions of the label values.
+            - **empty_to_fill** (ndarray): A array showing bounding boxes on image.
+    """
+    
     for thresh_value in np.arange(100, 190, 5): # Threshold to optimise the resulting text extraction.
         image = input_image_obj
         input_image_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -824,7 +894,39 @@ def Search_for_labels(
 
 
 def Plot_Digitized_data(Rticks, Rlocs, Lticks, Llocs, top_curve_coords):
-    # Function to digitize the segmetned data:
+    """
+    Digitize and plot the data.
+
+    This function digitizes and plots the segmented data based on tick marks from the left 
+    and right axes and the top curve coordinates. It aligns the data with the 
+    given tick marks, inverts the waveform if necessary, and scales the data 
+    to an arbitrary time scale and flow rate. The plot is then generated with 
+    the x-axis representing the arbitrary time scale and the y-axis showing 
+    the flow rate.
+
+    Args:
+        Rticks (list): A list of tick values on the right axis, assumed to be 
+            in ascending order.
+        Rlocs (list): A list of the locations (x, y coordinates) for each 
+            tick on the right axis.
+        Lticks (list): A list of tick values on the left axis, assumed to be 
+            in ascending order.
+        Llocs (list): A list of the locations (x, y coordinates) for each 
+            tick on the left axis.
+        top_curve_coords (list): A list of (x, y) coordinates representing 
+            the top curve of the waveform to be digitized.
+
+    Returns:
+        (tuple) : tuple containing:
+            - **Xplot** (list): A list of x-values for the digitized data, scaled to an arbitrary time scale.
+            - **Yplot** (list): A list of y-values for the digitized data, representing flow rate in cm/s.
+            - **Ynought** (list): A list containing the 0 value y co-ordinate for the digitized data (not used).
+
+    Note:
+        The function adjusts for cases where there is only one tick mark on 
+        the right axis, ensuring the digitization process can proceed. It 
+        also inverts the waveform if the average flow rate is negative.
+    """
 
     #We will have problems if the right axes only has 1 tick and that tick is equal to the minimum on the left axis
     if len(Rticks) == 1:
@@ -907,7 +1009,26 @@ def Plot_Digitized_data(Rticks, Rlocs, Lticks, Llocs, top_curve_coords):
 
 def Plot_correction(Xplot, Yplot, df):
     """
-    Use data from text extraction to correct the plot
+    Adjusts and corrects the digitized waveform data using extracted text data, identifies
+    and filters peaks and troughs, computes hemodynamic parameters, scales the time axis,
+    and plots the corrected waveform.
+
+    The function works by first inserting a new column for digitized values in the DataFrame.
+    It processes the waveform to identify and filter peaks and troughs, computes key 
+    hemodynamic parameters (PS, ED, S/D, RI, TAmax, PI), and updates these values in the
+    DataFrame. It also scales the x-axis to real-time based on heart rate information and
+    generates a plot of the corrected waveform.
+
+    Exceptions are handled by printing traceback information.
+
+    Args:
+        Xplot (list of float): The x-coordinates (time axis) of the waveform data.
+        Yplot (list of float): The y-coordinates (flowrate axis) of the waveform data.
+        df (pandas.DataFrame): The DataFrame with extracted text data including 
+                               hemodynamic parameters and heart rate.
+
+    Returns:
+        **df** (pandas.DataFrame): The DataFrame updated with computed parameters in the "Digitized Value" column.
     """
 
     try:
@@ -1001,6 +1122,95 @@ def Plot_correction(Xplot, Yplot, df):
     return df
 
 
+def Scan_type_test(input_image_filename):
+    """
+    Function for yellow filtering an image and searching for a list of target words indicative of
+    a doppler ultrasound scan taken using the Voluson E8, RAB6-D.
+
+    Args:
+        input_image_filename (str) : Name of file within current directory, or path to a file.
+
+    Returns:
+        **Fail** (int) : Idicates if the file is a fail (1) - doesn't meet criteria for a doppler ultrasound, or pass (0) - does meet criteria. 
+
+    """
+
+    img = cv2.imread(input_image_filename)  # Input image file
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)  # Convert to grayscale
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)  # Convert to HSV
+    lower_yellow = np.array([1, 100, 100], dtype=np.uint8)  # Lower yellow bound
+    upper_yellow = np.array([200, 255, 255], dtype=np.uint8)  # Upper yellow bound
+    mask = cv2.inRange(hsv, lower_yellow, upper_yellow)  # Threshold HSV between bounds
+    yellow_text = cv2.bitwise_and(gray, gray, mask=mask)
+
+    yellow_text[int(img.shape[1] * 0.45): img.shape[1], :] = 0  # Exclude bottom 3rd of image - target scans have no text of interest here.
+    pixels = np.array(yellow_text)
+    data = pytesseract.image_to_data(
+        pixels, output_type=Output.DICT, lang="eng", config="--psm 3 "
+    )
+
+    # Loop through each word and draw a box around it
+    for i in range(len(data["text"])):
+        x = data["left"][i]
+        y = data["top"][i]
+        segmentation_mask = data["width"][i]
+        h = data["height"][i]
+        if int(data["conf"][i]) > 1:
+            cv2.rectangle(img, (x, y), (x + segmentation_mask, y + h), (0, 0, 255), 2)
+
+    # Display image
+    # cv2.imshow('img', img)
+
+    # Perform OCR on the preprocessed image
+    custom_config = r"--oem 3 --psm 3"
+    text = pytesseract.image_to_string(pixels, lang="eng", config=custom_config)
+
+    # Analyze the OCR output
+    lines = text.splitlines()
+    target_words = [
+        "HR",
+        "TAmax",
+        "Lt Ut-PS",
+        "Lt Ut-ED",
+        "Lt Ut-S/D",
+        "Lt Ut-PI",
+        "Lt Ut-RI",
+        "Lt Ut-MD",
+        "Lt UT-TAmax",
+        "Lt Ut-HR",
+        "Rt Ut-PS",
+        "Rt Ut-ED",
+        "Rt Ut-S/D",
+        "Rt Ut-PI",
+        "Rt Ut-RI",
+        "Rt Ut-MD",
+        "Rt UT-TAmax",
+        "Rt Ut-HR",
+        "Umb-PS",
+        "Umb-ED",
+        "Umb-S/D",
+        "Umb-PI",
+        "Umb-RI",
+        "Umb-MD",
+        "Umb-TAmax",
+        "Umb-HR",
+    ]  # Target words to search for - there may be more to add to this.
+
+    # Split text into lines
+    lines = text.split("\n")
+
+    # Initialize DataFrame
+    df = pd.DataFrame(columns=["Line", "Word", "Value", "Unit"])
+
+    Fail = 1  # initialise fail variable
+    for target in target_words:
+        for word in lines:
+            if target in word:
+                Fail = 0 # If any of the words are found, then no fail.
+
+    return Fail, df  # Return the fail variable and dataframe contraining extracted text.
+
+
 def Annotate(
     input_image_obj,
     refined_segmentation_mask,
@@ -1010,7 +1220,35 @@ def Annotate(
     Left_axis,
     Right_axis,
 ):
-    # Function to annotate original image with the components computed in each of the previous functions.
+    """
+    Visual aid for evaluating segmentation.
+
+    Annotates the original image with the computed components from each of the
+    previous functions by overlaying polygons on the regions of interest (ROIs)
+    and highlighting them in specific colors.
+
+    The function draws perimeters around the provided dimensions for the left,
+    right, and waveform components on the segmentation mask. Then, it modifies
+    the input image's pixel data to overlay these perimeters and color-codes the
+    different regions: the waveform in red and the left/right axes in green,
+    and the bounds of the ticks and labels in magenta.
+
+    Args:
+        input_image_obj (PIL.Image.Image): The original image to be annotated.
+        refined_segmentation_mask (numpy.ndarray): The segmentation mask that
+            indicates the regions of interest.
+        Left_dimensions (tuple): The (x_min, x_max, y_min, y_max) dimensions for
+            the left region of interest.
+        Right_dimensions (tuple): The (x_min, x_max, y_min, y_max) dimensions for
+            the right region of interest.
+        Waveform_dimensions (tuple): The (x_min, x_max, y_min, y_max) dimensions
+            for the waveform region.
+        Left_axis (numpy.ndarray): The segmentation mask (ticks and labels) for the left axis.
+        Right_axis (numpy.ndarray): The segmentation mask (ticks and labels) for the right axis.
+
+    Returns:
+        PIL.Image.Image: The annotated image with ROIs color-coded and highlighted.
+    """
 
     Xmin, Xmax, Ymin, Ymax = Waveform_dimensions
     Xmin_R, Xmax_R, Ymin_R, Ymax_R = Right_dimensions
@@ -1064,16 +1302,11 @@ def Annotate(
     return img_RGB
 
 
-@lru_cache(maxsize=16384)
-def _in_cylinder(coord, bot, top, center, const):
-    coord = np.array(coord).reshape(1, 3)
-    above_bot = np.dot(coord - bot, center) >= 0
-    below_top = np.dot(coord - top, center) <= 0
-    within_rad = np.linalg.norm(np.cross(coord - bot, center.T)) <= const
-    return (above_bot and below_top and within_rad).item()
-
 def Colour_extract(input_image_obj, TargetRGB, cyl_length, cyl_radius):
     """Extract target colours from image.
+    
+    **The `Colour_extract()` function is deprecated and has been replaced by the function `Colour_extract_vectorised()`.**
+    **See the documentation for `Colour_extract_vectorised()` for more information.**
 
     Args:
         input_image_obj (PIL Image) : PIL Image object.
@@ -1114,6 +1347,21 @@ def Colour_extract(input_image_obj, TargetRGB, cyl_length, cyl_radius):
     return Image.fromarray(mask).convert("RGB")
 
 def appendSpherical_1point(xyz):
+    """
+    Appends spherical coordinates to a 3D point in Cartesian coordinates.
+
+    This function takes a single point (xyz) in Cartesian coordinates and calculates
+    its corresponding spherical coordinates. It appends the radial distance from the origin (r),
+    the angle in the XY plane from the positive X-axis (theta), and the angle from the
+    positive Z-axis (alpha), all in degrees.
+
+    Args:
+        xyz (np.ndarray): A numpy array of shape (3,) representing the x, y, and z 
+                          Cartesian coordinates of a point.
+
+    Returns:
+        **ptsnew** (ndarray): The input array with the spherical coordinates appended, resulting in a numpy array of shape (7,).
+    """
     ptsnew = np.hstack(
         (xyz, np.zeros(xyz.shape), np.zeros(xyz.shape), np.zeros(xyz.shape))
     )
@@ -1123,18 +1371,25 @@ def appendSpherical_1point(xyz):
     ptsnew[5] = np.arctan(np.divide(ptsnew[1], ptsnew[0])) * (180 / math.pi)  # theta
     ptsnew[6] = np.arcsin(np.divide(ptsnew[2], ptsnew[4])) * (180 / math.pi)  # alpha
     return ptsnew
+
 def Colour_extract_vectorized(input_image_obj, TargetRGB, cyl_length, cyl_radius):
     """
-    Extracts a target color from an image using a cylindrical filter in RGB space.
-    
+    Extracts a specified color from an image using a cylindrical filter in RGB space.
+
+    Given an image object and a target RGB color, this function creates a cylindrical
+    filter in RGB space defined by the specified length and radius. It extracts regions
+    of the image that match the color within the defined cylindrical space.
+
     Args:
-        input_image_filename (str): Path to the input image.
-        TargetRGB (list): Triplet representing the target RGB color.
-        cyl_length (int): Length of the cylindrical filter in RGB space.
-        cyl_radius (int): Radius of the cylindrical filter in RGB space.
-    
+        input_image_obj (np.ndarray): A 3D numpy array representing the RGB image.
+        TargetRGB (list): A list of three integers representing the target RGB color.
+        cyl_length (int): The length of the cylindrical filter along the axis of the color
+                          in RGB space.
+        cyl_radius (int): The radius of the cylindrical filter in RGB space.
+
     Returns:
-        PIL.Image.Image: An image where the target color regions are highlighted.
+        output_image (PIL.Image.Image): An image where regions matching the target color are highlighted
+                         and the rest of the image is set to black.
     """
     # Convert the target RGB color to spherical coordinates
     targ = np.array(TargetRGB)
@@ -1182,19 +1437,26 @@ def Colour_extract_vectorized(input_image_obj, TargetRGB, cyl_length, cyl_radius
     
     return output_image
 
-
-
 def Text_from_greyscale(input_image_obj, COL):
     """
-    Function for extracting text from the yellow filtered image.
+    Extracts and processes text from a greyscale image using OCR (Optical Character Recognition).
+    
+    This function applies preprocessing to the image to enhance text recognition, then uses
+    tesseract OCR to extract text data. It groups the text into lines and words, filters out
+    irrelevant parts of the image, and performs post-processing to structure the data into a
+    DataFrame. It also includes matching of specific target words and extraction of associated
+    numeric values and units, and uses known relationships between extracted metrics to correct
+    errors in text recognition. The function utilizes PIL for image manipulation, numpy for array
+    operations, scipy for image processing, pytesseract for OCR, and OpenCV for drawing bounding
+    boxes around the text.
 
     Args:
         input_image_filename (str) : Name of file within current directory, or path to a file.
         COL (JpegImageFile) : PIL JpegImageFile of the filtered image highlighting yellow text.
     Returns:
-        Fail (int) : Checks if the function has failed (1), or passed (0).
-        df (DataFrame) : Dataframe with columns 'Line', 'Word', 'Value', 'Unit'.
-        populated with data extracted from the image with tesseract.
+        (tuple): tuple containing:
+            - **Fail** (int) - Checks if the function has failed (1), or passed (0).
+            - **df** (DataFrame) - Dataframe with columns 'Line', 'Word', 'Value', 'Unit'. populated with data extracted from the image with tesseract.
 
     """
 
@@ -1683,14 +1945,22 @@ def Text_from_greyscale(input_image_obj, COL):
     return Fail, df
 
 def Metric_check(df):
-    """
-	Function to check dataframe values through comparison with their calculations
+    """Performs validation and correction of ultrasound measurement metrics within a DataFrame.
+
+    This function identifies the prefix used in the metrics (either left, right, or uterine artery),
+    checks for missing rows,and adds them if necessary. It applies common sense checks to the pulsatility index (PI) 
+    and time-averaged maximum velocity (TAmax) values to correct common OCR errors. The function 
+    also adjusts the peak systolic (PS) and end diastolic (ED) velocity values based on their 
+    relationship with other metrics, ensuring consistency. Lastly, it calculates the systolic
+    over diastolic ratio (S/D), resistance index (RI), and TAmax from the corrected PS and ED 
+    values and checks them against the extracted metrics for consistency.
+
 
 	Args:
-		df (DataFrame): Extracted data from image
+		- **df** (DataFrame): Extracted data from image
 
 	Returns:
-		df(DataFrame): DataFrame with corrected values after metric checking calculations
+		- df (DataFrame): DataFrame with corrected values after metric checking calculations
 	"""
         
     def identify_prefix(lines):
@@ -2007,14 +2277,24 @@ def Metric_check(df):
     return df
 
 def upscale_both_images(PIL_img, cv2_img, max_length=950, min_length=950):
-    """
-    Upscale both a PIL and an OpenCV image, maintaining their aspect ratios.
+    """ **For testing improved text extraction**
 
-    :param PIL_img: PIL Image object.
-    :param cv2_img: OpenCV Image object.
-    :param max_length: The maximum length of the longest edge of the image.
-    :param min_length: The minimum length for upscaling.
-    :return: Tuple containing the upscaled PIL Image and OpenCV Image.
+    Upscales both a PIL and an OpenCV image to a specified maximum length while 
+    maintaining their aspect ratios. If the longest edge of an image is already 
+    greater than or equal to the specified minimum length, the image will not be upscaled.
+
+    Args:
+        PIL_img (PIL.Image.Image): The image to upscale using the PIL library.
+        cv2_img (numpy.ndarray): The image to upscale using the OpenCV library.
+        max_length (int, optional): The maximum length of the longest edge after upscaling. 
+                                    Defaults to 950.
+        min_length (int, optional): The minimum length required to trigger upscaling. 
+                                    If the longest edge of the image is already greater 
+                                    than or equal to this length, upscaling does not occur. 
+                                    Defaults to 950.
+
+    Returns:
+        tuple: A tuple containing the upscaled PIL.Image.Image and upscaled numpy.ndarray (OpenCV image) respectively.
     """
 
     def upscale_image(image, is_pil):
@@ -2049,7 +2329,13 @@ def upscale_both_images(PIL_img, cv2_img, max_length=950, min_length=950):
 
 def Metric_check_DV(df):
     """
-	Function to check dataframe values through comparison with their calculations
+	Performs validation and correction of ultrasound measurement metrics within a DataFrame
+    for Ductus Venosus (DV).
+
+    This function performs the same function as Metric_check, but for Ductus Venosus. Metric_check
+    works for left, right and ubilical arteries as their scans all contain the same patient measurements,
+    but DV scans have a seperate set of measurements with their own unique relationship - this function
+    corrects the values for DV scans.
 
 	Args:
 		df (DataFrame): Extracted data from image
@@ -2350,93 +2636,4 @@ def Metric_check_DV(df):
 
 
     return df
-
-
-
-def Scan_type_test(input_image_filename):
-    """
-    Function for yellow filtering an image and searching for a list of target words indicative of a doppler ultrasound scan
-
-    Args:
-        input_image_filename (str) : Name of file within current directory, or path to a file.
-
-    Returns:
-        Fail (int) : Idicates if the file is a fail (1) - doesn't meet criteria for a doppler ultrasound, or pass (0) - does meet criteria. 
-
-    """
-
-    img = cv2.imread(input_image_filename)  # Input image file
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)  # Convert to grayscale
-    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)  # Convert to HSV
-    lower_yellow = np.array([1, 100, 100], dtype=np.uint8)  # Lower yellow bound
-    upper_yellow = np.array([200, 255, 255], dtype=np.uint8)  # Upper yellow bound
-    mask = cv2.inRange(hsv, lower_yellow, upper_yellow)  # Threshold HSV between bounds
-    yellow_text = cv2.bitwise_and(gray, gray, mask=mask)
-
-    yellow_text[int(img.shape[1] * 0.45): img.shape[1], :] = 0  # Exclude bottom 3rd of image - target scans have no text of interest here.
-    pixels = np.array(yellow_text)
-    data = pytesseract.image_to_data(
-        pixels, output_type=Output.DICT, lang="eng", config="--psm 3 "
-    )
-
-    # Loop through each word and draw a box around it
-    for i in range(len(data["text"])):
-        x = data["left"][i]
-        y = data["top"][i]
-        segmentation_mask = data["width"][i]
-        h = data["height"][i]
-        if int(data["conf"][i]) > 1:
-            cv2.rectangle(img, (x, y), (x + segmentation_mask, y + h), (0, 0, 255), 2)
-
-    # Display image
-    # cv2.imshow('img', img)
-
-    # Perform OCR on the preprocessed image
-    custom_config = r"--oem 3 --psm 3"
-    text = pytesseract.image_to_string(pixels, lang="eng", config=custom_config)
-
-    # Analyze the OCR output
-    lines = text.splitlines()
-    target_words = [
-        "HR",
-        "TAmax",
-        "Lt Ut-PS",
-        "Lt Ut-ED",
-        "Lt Ut-S/D",
-        "Lt Ut-PI",
-        "Lt Ut-RI",
-        "Lt Ut-MD",
-        "Lt UT-TAmax",
-        "Lt Ut-HR",
-        "Rt Ut-PS",
-        "Rt Ut-ED",
-        "Rt Ut-S/D",
-        "Rt Ut-PI",
-        "Rt Ut-RI",
-        "Rt Ut-MD",
-        "Rt UT-TAmax",
-        "Rt Ut-HR",
-        "Umb-PS",
-        "Umb-ED",
-        "Umb-S/D",
-        "Umb-PI",
-        "Umb-RI",
-        "Umb-MD",
-        "Umb-TAmax",
-        "Umb-HR",
-    ]  # Target words to search for - there may be more to add to this.
-
-    # Split text into lines
-    lines = text.split("\n")
-
-    # Initialize DataFrame
-    df = pd.DataFrame(columns=["Line", "Word", "Value", "Unit"])
-
-    Fail = 1  # initialise fail variable
-    for target in target_words:
-        for word in lines:
-            if target in word:
-                Fail = 0 # If any of the words are found, then no fail.
-
-    return Fail, df  # Return the fail variable and dataframe contraining extracted text.
 

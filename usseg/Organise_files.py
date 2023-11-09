@@ -22,7 +22,14 @@ import traceback
 # ... other imports ...
 
 def check_file_for_us(file_path):
-    """Check a single file to see if it's a likely ultrasound and return its path."""
+    """Checks a single file to see if it's a likely ultrasound and returns its path.
+
+    Args:
+        file_path: The path to the file to be checked.
+
+    Returns:
+        A tuple of (patient_id, file_path) if the file is a likely ultrasound, or `None` otherwise.
+    """
     if file_path.endswith('.JPG'):
         try:
             Fail, df = General_functions.Scan_type_test(file_path)
@@ -37,8 +44,16 @@ def check_file_for_us(file_path):
     return None
 
 def get_likely_us(root_dir, pickle_path=None, use_parallel=True):
-    """Searches a directory and identifies the images that are likely to be doppler ultrasounds."""
+    """Searches a directory and identifies the images that are likely to be doppler ultrasounds.
 
+    Args:
+        root_dir: The path to the directory to be searched.
+        pickle_path: The path to the pickle file to save the results to. If `None`, the results will be saved to the current directory.
+        use_parallel: Whether to use a parallel thread pool to process the files.
+
+    Returns:
+        A list of paths to the images that are likely to be doppler ultrasounds.
+    """
     # Initialize a dictionary to store the paths for each patient
     patient_paths = {}
 

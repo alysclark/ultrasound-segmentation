@@ -1,5 +1,22 @@
-#! /usr/bin/env python3
-"""Segments a single ultrasound image object."""
+"""Segment a single ultrasound image object.
+
+This module provides a number of functions for segmenting single ultrasound images,
+extracting segmentation and textual data from the images.
+
+**Usage:**
+
+To segment a single ultrasound image, you can use the following code:
+
+```python
+from usseg.Single_image_processing import data_from_image
+
+# Load the ultrasound image.
+PIL_img = ...
+cv2_img = ...
+
+# Extract segmentation and textual data from the image.
+df, XYdata = data_from_image(PIL_img, cv2_img)```
+"""
 
 
 # Python imports

@@ -75,11 +75,14 @@ def segment(filenames=None, output_dir=None, pickle_path=None):
             will load the pickle path from "config.toml".
             Else if a string, will dump the pickled list to the specified path.
             Defaults to None.
+    Returns:
+        (tuple): tuple containing:
+            - **filenames** (list): A list of the paths to the images that were segmented.
+            - **Digitized_scans** (list): A list of the paths to the digitized scans.
+            - **Annotated_scans** (list): A list of the paths to the annotated scans.
+            - **Text_data** (list): A list of the text data extracted from the scans, as strings.
     """
 
-    # filenames = next(walk('Scans/'), (None, None, []))[2]  # [] if no file
-    # text_file = open("sample3_file_list_test.txt", "r")
-    # filenames = text_file.read().replace('\'','').replace('[','').replace(']','').replace(' ','').split(',')
     if filenames is None:
         filenames = ["Lt_test_image.png"]
 
