@@ -111,7 +111,7 @@ Each function in these sequences plays a vital role in the overall process, whic
 
 ## Usage Examples
 
-Some introduction to examples...
+Some common usage examples include segmenting a single image, or processing a batch of images.
 
 ### Processing a Single Image
 
@@ -131,7 +131,39 @@ PIL_image = Image.open(img_path)
 cv2_image = np.array(PIL_image)
 df, (xdata, ydata) = data_from_image(PIL_image, cv2_image)
 ```
+Alternatively, the single image processing script within the tests folder can be modified for 
+any given input image.
+
 ### Batch processing images
+
+For processing groups of images, the usseg.main module can be used. This module is designed 
+to process a series of images contained in a folder and save to specified location, defined in the config.toml. 
+A visualisation file output.html is generated for evaluation the data extraction. This can be done through:
 ```python
 python usseg/main.py
 ```
+
+## Limitation and future work
+
+Work on this data extraction package is ongoing. Testing and development
+have highlighted several limitations and areas for improvement, guiding
+the next steps in its evolution.
+
+The package is currently designed for scans typical of the Voluson E8.
+This typically includes measurements in the upper right corner in yellow
+and the Doppler waveform in the center bottom half, including both left
+and right y-axes. While the functions leverage these features to ensure
+accuracy, a limitation is their ineffectiveness with scans from different
+types of machines. However, the framework is robust, and minor
+modifications could adapt it for other ultrasound devices.
+
+Regarding data extraction, there are occasions where text data is not
+correctly extracted. Errors might include missing decimal points or
+misinterpretation of characters (e.g., '5' read as an 'S'). Common-sense
+checks help mitigate these errors, but they are not foolproof.
+
+Waveform segmentation and digitization quality often depend on the
+image's contrast. Faint waveforms against the black background might
+result in inaccurate segmentation or complete failure to identify.
+Furthermore, some scans are inverted, and although there are measures
+to adjust these during digitization, exceptions can still occur.

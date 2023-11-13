@@ -123,7 +123,7 @@ to the detailed descriptions in the :doc:`here <usseg>` section of this document
 Usage Examples
 ==============
 
-Some introduction to examples...
+Some common usage examples include segmenting a single image, or processing a batch of images.
 
 Processing a single image
 -------------------------
@@ -159,8 +159,33 @@ A visualisation file output.html is generated for evaluation the data extraction
    python usseg/main.py
 
 .. _limitations:
-Limitations
-===========
+Limitations and future work
+===========================
+
+Work on this data extraction package is ongoing. Testing and development
+have highlighted several limitations and areas for improvement, guiding
+the next steps in its evolution.
+
+The package is currently designed for scans typical of the Voluson E8.
+This typically includes measurements in the upper right corner in yellow
+and the Doppler waveform in the center bottom half, including both left
+and right y-axes. While the functions leverage these features to ensure
+accuracy, a limitation is their ineffectiveness with scans from different
+types of machines. However, the framework is robust, and minor
+modifications could adapt it for other ultrasound devices.
+
+Regarding data extraction, there are occasions where text data is not
+correctly extracted. Errors might include missing decimal points or
+misinterpretation of characters (e.g., '5' read as an 'S'). Common-sense
+checks help mitigate these errors, but they are not foolproof.
+
+Waveform segmentation and digitization quality often depend on the
+image's contrast. Faint waveforms against the black background might
+result in inaccurate segmentation or complete failure to identify.
+Furthermore, some scans are inverted, and although there are measures
+to adjust these during digitization, exceptions can still occur.
+
+
 
 .. |Search for Labels| image:: TickandLabel_diagram.png
    :width: 45%
