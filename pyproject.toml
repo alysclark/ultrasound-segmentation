@@ -21,6 +21,7 @@ plotly = "^5.14.1"
 toml = "^0.10.2"
 scikit-learn = "^1.2.2"
 opencv-contrib-python = "^4.7.0.72"
+super-image = "^0.1.7"
 
 
 [tool.poetry.group.dev.dependencies]

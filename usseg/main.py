@@ -1,4 +1,34 @@
-"""Main script for running the file organisation and segmentation"""
+"""
+Main script for running the file organisation and segmentation.
+
+This script can be used to segment ultrasound images and generate an output.html file containing the segmented output.
+
+**Usage:**
+
+python usseg.main.py root_dir
+
+where `root_dir` is the root directory containing the ultrasound images to be segmented.
+
+**Example:**
+
+To segment all of the ultrasound images in the directory `E:/us-data-anon`, you would run the following command:
+
+python usseg.main.py E:/us-data-anon
+
+This will generate an output.html file in the current directory containing the segmented output for all of the ultrasound images in the `E:/us-data-anon` directory.
+
+**Configuration options:**
+
+The script can be configured using the `config.toml` file. The `config.toml` file should be placed in the same directory as the script.
+
+The only configuration option currently supported is the `root_dir` key. The `root_dir` key specifies the root directory containing the ultrasound images to be segmented.
+
+**Known issues and limitations:**
+
+The script is currently under development and may contain bugs.
+
+"""
+
 #/usr/bin/env python3
 
 # Python imports
@@ -46,6 +76,7 @@ def main(root_dir):
     filenames = prof(usseg.get_likely_us, root_dir)
 
     # Segments and digitises the pre-selected ultrasound images.
+    #filenames = "E:/us-data-anon/0000\IHE_PDI/00003511\AA752528\AA53DB17/0000DE5F/EEF4366C.JPG"
     prof(usseg.segment, filenames)
 
     # Generates an output.html of the segmented output
@@ -53,4 +84,5 @@ def main(root_dir):
 
 if __name__ == "__main__":
     root_dir = toml.load("config.toml")["root_dir"]
+    #root_dir = "E:/us-data-anon/0039"
     main(root_dir)

@@ -75,11 +75,14 @@ def segment(filenames=None, output_dir=None, pickle_path=None):
             will load the pickle path from "config.toml".
             Else if a string, will dump the pickled list to the specified path.
             Defaults to None.
+    Returns:
+        (tuple): tuple containing:
+            - **filenames** (list): A list of the paths to the images that were segmented.
+            - **Digitized_scans** (list): A list of the paths to the digitized scans.
+            - **Annotated_scans** (list): A list of the paths to the annotated scans.
+            - **Text_data** (list): A list of the text data extracted from the scans, as strings.
     """
 
-    # filenames = next(walk('Scans/'), (None, None, []))[2]  # [] if no file
-    # text_file = open("sample3_file_list_test.txt", "r")
-    # filenames = text_file.read().replace('\'','').replace('[','').replace(']','').replace(' ','').split(',')
     if filenames is None:
         filenames = ["Lt_test_image.png"]
 
@@ -126,6 +129,7 @@ def segment(filenames=None, output_dir=None, pickle_path=None):
 
         try:  # Try text extraction
             colRGBA = Image.open(input_image_filename)  # These images are in RGBA form
+            #colRGBA = General_functions.upscale_to_fixed_longest_edge(colRGBA)  # upscale to longest edge
             PIL_col = colRGBA.convert("RGB")  # We need RGB, so convert here. with PIL
             cv2_img = cv2.imread(input_image_filename) # with cv2.
             # pix = (
@@ -133,7 +137,7 @@ def segment(filenames=None, output_dir=None, pickle_path=None):
             # )  # Loads a pixel access object, where pixel values can be edited
 
             # from General_functions import Colour_extract, Text_from_greyscale
-            COL = General_functions.Colour_extract(PIL_col, [255, 255, 100], 80, 80)
+            COL = General_functions.Colour_extract_vectorized(PIL_col, [255, 255, 100], 95, 95)
             logger.info("Done Colour extract")
 
             Fail, df = General_functions.Text_from_greyscale(cv2_img, COL)

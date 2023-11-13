@@ -1,5 +1,22 @@
-#! /usr/bin/env python3
-"""Segments a single ultrasound image object."""
+"""Segment a single ultrasound image object.
+
+This module provides a number of functions for segmenting single ultrasound images,
+extracting segmentation and textual data from the images.
+
+**Usage:**
+
+To segment a single ultrasound image, you can use the following code:
+
+```python
+from usseg.Single_image_processing import data_from_image
+
+# Load the ultrasound image.
+PIL_img = ...
+cv2_img = ...
+
+# Extract segmentation and textual data from the image.
+df, XYdata = data_from_image(PIL_img, cv2_img)```
+"""
 
 
 # Python imports
@@ -30,8 +47,11 @@ def data_from_image(PIL_img,cv2_img):
         XYdata (list) : X and Y coordinates of the extracted segmentation.
     """
     # Extracts yellow text from image
+    #PIL_img , cv2_img = General_functions.upscale_both_images(PIL_img,cv2_img)
     PIL_image_RGB = PIL_img.convert("RGB")  # We need RGB, so convert here. with PIL
-    COL = General_functions.Colour_extract(PIL_image_RGB, [255, 255, 100], 80, 80)
+    COL = General_functions.Colour_extract_vectorized(PIL_image_RGB, [255, 255, 100], 95, 95)
+
+    #COL = General_functions.Colour_extract(PIL_image_RGB, [255, 255, 100], 100, 100)
     text_extract_failed, df = General_functions.Text_from_greyscale(cv2_img, COL)
     # Failure not really relavent to the rest of the segmenation so just logged as 
     # a warning for the end user.
