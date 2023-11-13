@@ -5,9 +5,12 @@ tmp/
 *.pkl
 *.pickle
 output.html
+output2.html
+output3.html
+output4.html
 test1.txt
 *__pycache__*
 dist/
 config.toml
 *~
-*#
+upscaling_AI.py
