@@ -32,7 +32,7 @@ def check_file_for_us(file_path):
     """
     if file_path.endswith('.JPG'):
         try:
-            Fail, df = General_functions.Scan_type_test(file_path)
+            Fail, df = General_functions.scan_type_test(file_path)
             if Fail == 0:
                 # Extract patient ID from the file path
                 match = re.search(r"\d{4}", file_path)

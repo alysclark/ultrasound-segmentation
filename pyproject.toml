@@ -34,10 +34,9 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Medical Science Apps.",
 ]
 
-[tool.setuptools]
-packages = ["usseg"]
-
 [tool.setuptools_scm]
+version_scheme = "no-guess-dev"
+local_scheme = "dirty-tag"
 
 #[tool.poetry.dependencies]
 #python = ">=3.10,<3.12"

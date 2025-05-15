@@ -247,7 +247,7 @@ def test_colour_extraction():
 
     t_init = time.time()
     for _ in range(num_iter):
-        img_extracted_new = usseg.General_functions.Colour_extract(image, target_colour, rad, height)
+        img_extracted_new = usseg.General_functions.colour_extract(image, target_colour, rad, height)
     t_fin_new = (time.time() - t_init) / num_iter
 
     t_init = time.time()

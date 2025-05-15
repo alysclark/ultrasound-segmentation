@@ -49,10 +49,10 @@ def data_from_image(PIL_img,cv2_img):
     # Extracts yellow text from image
     #PIL_img , cv2_img = General_functions.upscale_both_images(PIL_img,cv2_img)
     PIL_image_RGB = PIL_img.convert("RGB")  # We need RGB, so convert here. with PIL
-    COL = General_functions.Colour_extract_vectorized(PIL_image_RGB, [255, 255, 100], 95, 95)
+    COL = General_functions.colour_extract_vectorized(PIL_image_RGB, [255, 255, 100], 95, 95)
 
     #COL = General_functions.Colour_extract(PIL_image_RGB, [255, 255, 100], 100, 100)
-    text_extract_failed, df = General_functions.Text_from_greyscale(cv2_img, COL)
+    text_extract_failed, df = General_functions.text_from_greyscale(cv2_img, COL)
     # Failure not really relavent to the rest of the segmenation so just logged as 
     # a warning for the end user.
     if text_extract_failed:
@@ -67,7 +67,7 @@ def data_from_image(PIL_img,cv2_img):
     )
 
     # Gets ROIS
-    Left_dimensions, Right_dimensions = General_functions.Define_end_ROIs(
+    Left_dimensions, Right_dimensions = General_functions.define_end_rois(
         segmentation_mask, Xmin, Xmax, Ymin, Ymax
     )
 
@@ -85,10 +85,10 @@ def data_from_image(PIL_img,cv2_img):
         Right_dimensions,
         ROI2,
         ROI3,
-    ) = General_functions.Search_for_ticks(
+    ) = General_functions.search_for_ticks(
         cv2_img, "Left", Left_dimensions, Right_dimensions
     )
-    ROIAX, Lnumber, Lpositions, ROIL = General_functions.Search_for_labels(
+    ROIAX, Lnumber, Lpositions, ROIL = General_functions.search_for_labels(
         Cs,
         ROIAX,
         CenPoints,
@@ -116,10 +116,10 @@ def data_from_image(PIL_img,cv2_img):
         Right_dimensions,
         ROI2,
         ROI3,
-    ) = General_functions.Search_for_ticks(
+    ) = General_functions.search_for_ticks(
         cv2_img, "Right", Left_dimensions, Right_dimensions
     )
-    ROIAX, Rnumber, Rpositions, ROIR = General_functions.Search_for_labels(
+    ROIAX, Rnumber, Rpositions, ROIR = General_functions.search_for_labels(
         Cs,
         ROIAX,
         CenPoints,
@@ -136,17 +136,17 @@ def data_from_image(PIL_img,cv2_img):
 
     (
         refined_segmentation_mask, top_curve_mask, top_curve_coords
-    ) = General_functions.Segment_refinement(
+    ) = General_functions.segment_refinement(
         cv2_img, Xmin, Xmax, Ymin, Ymax
     )
 
     # Gets the segmentation
-    Xplot, Yplot, Ynought = General_functions.Plot_Digitized_data(
+    Xplot, Yplot, Ynought = General_functions.plot_digitized_data(
         Rnumber, Rpositions, Lnumber, Lpositions, top_curve_coords,
     )
 
     if not text_extract_failed:
-        df = General_functions.Plot_correction(Xplot, Yplot, df)
+        df = General_functions.plot_correction(Xplot, Yplot, df)
 
     plt.close("all")
     XYdata = [Xplot, Yplot]

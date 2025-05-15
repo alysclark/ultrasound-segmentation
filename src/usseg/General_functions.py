@@ -26,11 +26,10 @@ import pandas as pd
 import pytesseract
 from pytesseract import Output
 
-
 logger = logging.getLogger(__file__)
 
-
 root = None  # Assuming you have a reference to the main tkinter window
+
 
 def execute_on_main_thread_and_wait(func, *args, **kwargs):
     import threading
@@ -68,13 +67,14 @@ def execute_on_main_thread_and_wait(func, *args, **kwargs):
 
         root.after(0, callback)
         event.wait()  # Block until the function completes on the main thread
-        
+
         if exception:
             raise exception  # Re-raise any exception that occurred on the main thread
 
         return result
 
-def Initial_segmentation(input_image_obj):
+
+def initial_segmentation(input_image_obj):
     """
     Initial segmentation of an ultrasound image.
 
@@ -87,7 +87,7 @@ def Initial_segmentation(input_image_obj):
     bounding box coordinates of the waveform.
 
     Args:
-        input_image_filename (str): Name of file within current directory, or path to a file.
+        input_image_obj (str): Name of file within current directory, or path to a file.
 
     Returns:
         tuple: tuple containing:
@@ -127,7 +127,7 @@ def Initial_segmentation(input_image_obj):
                 if y < 400:  # for some reason x==0 is white, this line negates this.
                     pixel_data[x, y] = (0, 0, 0)
             else:
-                if y < 20:  
+                if y < 20:
                     pixel_data[x, y] = (0, 0, 0)
 
     binary_image = np.asarray(img_RGB)  # Make the image an nparray
@@ -171,7 +171,8 @@ def Initial_segmentation(input_image_obj):
 
     return segmentation_mask, Xmin, Xmax, Ymin, Ymax
 
-def Define_end_ROIs(segmentation_mask, Xmin, Xmax, Ymin, Ymax):
+
+def define_end_rois(segmentation_mask, Xmin, Xmax, Ymin, Ymax):
     """
     Defines regions of interest (ROIs) to the left and right of a segmented
     waveform for the purpose of searching for axis information. These regions
@@ -223,6 +224,7 @@ def Define_end_ROIs(segmentation_mask, Xmin, Xmax, Ymin, Ymax):
     Right_dimensions = [Xmin_R, Xmax_R, Ymin_R, Ymax_R]
     return Left_dimensions, Right_dimensions
 
+
 def check_inverted_curve(top_curve_mask, Ymax, Ymin, tol=.25):
     """Checks to see if top curve mask is of an inverted waveform
 
@@ -238,11 +240,12 @@ def check_inverted_curve(top_curve_mask, Ymax, Ymin, tol=.25):
     Returns:
         *return value* (bool) : True if the top curve is of an inverted waveform, False is the top curve is of a non-inverted waveform.
     """
-    c_rows = np.where(np.sum(top_curve_mask, axis=1))   # Curve rows
-    c_range = np.max(c_rows) - np.min(c_rows)           # Y range of top curve
+    c_rows = np.where(np.sum(top_curve_mask, axis=1))  # Curve rows
+    c_range = np.max(c_rows) - np.min(c_rows)  # Y range of top curve
     return c_range / (Ymax - Ymin) < tol
 
-def Segment_refinement(input_image_obj, Xmin, Xmax, Ymin, Ymax):
+
+def segment_refinement(input_image_obj, Xmin, Xmax, Ymin, Ymax):
     """
     Refines the segmentation of a waveform within specified bounds, improving 
     the separation between the waveform and background. It processes a given 
@@ -274,10 +277,10 @@ def Segment_refinement(input_image_obj, Xmin, Xmax, Ymin, Ymax):
     image = input_image_obj
     input_image_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     ret, thresholded_image = cv2.threshold(input_image_gray, 30, 255, 0)
-    thresholded_image[:, int(Xmax) : -1] = 0
-    thresholded_image[:, 0 : int(Xmin) - 1] = 0
-    thresholded_image[0 : int(Ymin) - 50, :] = 0
-    thresholded_image[int(Ymax) : -1, :] = 0
+    thresholded_image[:, int(Xmax): -1] = 0
+    thresholded_image[:, 0: int(Xmin) - 1] = 0
+    thresholded_image[0: int(Ymin) - 50, :] = 0
+    thresholded_image[int(Ymax): -1, :] = 0
     main_ROI = thresholded_image  # Main ROI
 
     binary_image = main_ROI  # Make the image an nparray
@@ -340,7 +343,8 @@ def Segment_refinement(input_image_obj, Xmin, Xmax, Ymin, Ymax):
 
     return refined_segmentation_mask, top_curve_mask, top_curve_coords
 
-def Search_for_ticks(input_image_obj, Side, Left_dimensions, Right_dimensions):
+
+def search_for_ticks(input_image_obj, side, left_dimensions, right_dimensions):
     """
     Search for tick marks on either the left or right axis of an image.
 
@@ -352,10 +356,10 @@ def Search_for_ticks(input_image_obj, Side, Left_dimensions, Right_dimensions):
     details of the processing.
 
     Args:
-        input_image_filename (str) : Name of file within current directory, or path to a file.
-        Side (str) : Indicates the 'Left' or 'Right' axes.
-        Left_dimensions (list) : edge points for the left axes ROI [Xmin, Xmax, Ymin, Ymax].
-        Right_dimensions (list) : edge points for the left axes ROI [Xmin, Xmax, Ymin, Ymax].
+        input_image_obj (str) : Name of file within current directory, or path to a file.
+        side (str) : Indicates the 'Left' or 'Right' axes.
+        left_dimensions (list) : edge points for the left axes ROI [Xmin, Xmax, Ymin, Ymax].
+        right_dimensions (list) : edge points for the left axes ROI [Xmin, Xmax, Ymin, Ymax].
 
     Returns:
         (tuple) : tuple containing:
@@ -376,16 +380,16 @@ def Search_for_ticks(input_image_obj, Side, Left_dimensions, Right_dimensions):
     image = input_image_obj
     thresholded_image = image
 
-    if Side == "Left":
+    if side == "Left":
         ROIAX = thresholded_image[
-            int(Left_dimensions[2]) : int(Left_dimensions[3]),
-            int(Left_dimensions[0]) : int(Left_dimensions[1]),
-        ]  # Right ROI
-    elif Side == "Right":
+                int(left_dimensions[2]): int(left_dimensions[3]),
+                int(left_dimensions[0]): int(left_dimensions[1]),
+                ]  # Right ROI
+    elif side == "Right":
         ROIAX = thresholded_image[
-            int(Right_dimensions[2]) : int(Right_dimensions[3]),
-            int(Right_dimensions[0]) : int(Right_dimensions[1]),
-        ]  # Left ROI
+                int(right_dimensions[2]): int(right_dimensions[3]),
+                int(right_dimensions[0]): int(right_dimensions[1]),
+                ]  # Left ROI
 
     RGBnp = np.array(ROIAX)  # convert images to array (not sure needed)
     RGBnp[RGBnp <= 10] = 0  # Make binary with low threshold
@@ -402,18 +406,18 @@ def Search_for_ticks(input_image_obj, Side, Left_dimensions, Right_dimensions):
     input_image_gray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
     ret, thresholded_image = cv2.threshold(input_image_gray, 127, 255, 0)
 
-    if Side == "Left":
+    if side == "Left":
         ROIAX = thresholded_image[
-            int(Left_dimensions[2]) : int(Left_dimensions[3]),
-            int(Left_dimensions[0]) : int(Left_dimensions[1]),
-        ]  # Right ROI
+                int(left_dimensions[2]): int(left_dimensions[3]),
+                int(left_dimensions[0]): int(left_dimensions[1]),
+                ]  # Right ROI
         TGT = 48
-    elif Side == "Right":
+    elif side == "Right":
         TGT = 2
         ROIAX = thresholded_image[
-            int(Right_dimensions[2]) : int(Right_dimensions[3]),
-            int(Right_dimensions[0]) : int(Right_dimensions[1]),
-        ]  # Left ROI
+                int(right_dimensions[2]): int(right_dimensions[3]),
+                int(right_dimensions[0]): int(right_dimensions[1]),
+                ]  # Left ROI
 
     ROI2 = np.zeros(np.shape(ROIAX))
     ROI3 = np.zeros(np.shape(ROIAX))
@@ -425,12 +429,12 @@ def Search_for_ticks(input_image_obj, Side, Left_dimensions, Right_dimensions):
     )
     cv2.drawContours(ROI2, contours, -1, [255], 1)
     Cs = list(contours)  # list the contour coordinates as array
-    if Side == "Right":
+    if side == "Right":
         for Column in range(
-            0, int(Right_dimensions[1]) - int(Right_dimensions[0])
+                0, int(right_dimensions[1]) - int(right_dimensions[0])
         ):  # Move across and find the line with most contours in.
             count = 0
-            for Row in range(0, (int(Right_dimensions[3]) - int(Right_dimensions[2]))):
+            for Row in range(0, (int(right_dimensions[3]) - int(right_dimensions[2]))):
                 if ROI2[Row, Column] == 255:
                     count = count + 1
 
@@ -465,8 +469,8 @@ def Search_for_ticks(input_image_obj, Side, Left_dimensions, Right_dimensions):
     ids = np.where(lengths > 0)  # indexes of the lengths greater than 0
     ids = ids[0]  # because ids looks like (array([...])) and we want array([...])
     ids = ids[
-        ::-1
-    ]  # reverse order so indexes run fron high to low, this is needed for the next loop
+          ::-1
+          ]  # reverse order so indexes run fron high to low, this is needed for the next loop
     onY, BCs, Xs, EndPoints, CenPoints = (
         [],
         [],
@@ -476,7 +480,7 @@ def Search_for_ticks(input_image_obj, Side, Left_dimensions, Right_dimensions):
     )  # Initialise some variables
 
     all = []
-    for TGT in range(0, int(Right_dimensions[1]) - int(Right_dimensions[0])):
+    for TGT in range(0, int(right_dimensions[1]) - int(right_dimensions[0])):
         count = 0
         Ctest = 0
         for id in ids:
@@ -488,9 +492,9 @@ def Search_for_ticks(input_image_obj, Side, Left_dimensions, Right_dimensions):
         all.append(count)
 
     peaks, vals = signal.find_peaks(all, height=3)  # Miss last 20 pixels as
-    if Side == "Left":
+    if side == "Left":
         maxID = np.argmax(peaks)
-    elif Side == "Right":
+    elif side == "Right":
         peak_wid = signal.peak_widths(all, peaks)
         maxID = np.argmax(vals["peak_heights"] * peak_wid[0])
 
@@ -501,7 +505,7 @@ def Search_for_ticks(input_image_obj, Side, Left_dimensions, Right_dimensions):
         Ctest = np.reshape(Cs[id], (-1, 2))
         x_values = [i[0] for i in Ctest]
         if (
-            TGT in x_values
+                TGT in x_values
         ):  # Looks if any contour coords are on a line (2,:), this is close to ROI bounds but not in contact.
             tempXs, tempYs = (
                 [],
@@ -519,14 +523,14 @@ def Search_for_ticks(input_image_obj, Side, Left_dimensions, Right_dimensions):
             MINX = min(tempXs)  # Min X from this contour
             MAXY = max(tempYs)  # Max Y from this contour
             MINY = min(tempYs)  # Min Y from this contour
-            if Side == "Left":
+            if side == "Left":
                 index = tempXs.index(
                     MINX
                 )  # Index of the max X - this is the "end point" of Side == "Right"
                 EndPoints.append(
                     tempXs[index]
                 )  # Save end point (Might be redundant with new method?)
-            elif Side == "Right":
+            elif side == "Right":
                 index = tempXs.index(
                     MAXX
                 )  # Index of the max X - this is the "end point" of Side == "Right"
@@ -551,11 +555,11 @@ def Search_for_ticks(input_image_obj, Side, Left_dimensions, Right_dimensions):
 
         return outdata, badIDS
 
-    if Side == "Right":
+    if side == "Right":
         TYLshift = max(
             EndPoints
         )  # The shift reduces the ROIAX to avoid intaining the ticks, as these can be confused as '-' symbols
-    elif Side == "Left":
+    elif side == "Left":
         EndPoints, badIDS = reject_outliers(EndPoints)
         try:
             # cv2.drawContours(ROI3, Cs[badIDS[0]], -1,[255], 1)
@@ -571,16 +575,16 @@ def Search_for_ticks(input_image_obj, Side, Left_dimensions, Right_dimensions):
         )  # The shift reduces the ROIAX to avoid intaining the ticks, as these can be confused as '-' symbols
     Cs = tuple(Cs)  # Change to tuple?
 
-    if Side == "Left":
+    if side == "Left":
         ROIAX = thresholded_image[
-            int(Left_dimensions[2]) : int(Left_dimensions[3]),
-            int(Left_dimensions[0]) : int(Left_dimensions[0] + TYLshift),
-        ]  # Right ROI
-    elif Side == "Right":
+                int(left_dimensions[2]): int(left_dimensions[3]),
+                int(left_dimensions[0]): int(left_dimensions[0] + TYLshift),
+                ]  # Right ROI
+    elif side == "Right":
         ROIAX = thresholded_image[
-            int(Right_dimensions[2]) : int(Right_dimensions[3]),
-            int(Right_dimensions[0] + TYLshift) : int(Right_dimensions[1]),
-        ]  # Left ROI
+                int(right_dimensions[2]): int(right_dimensions[3]),
+                int(right_dimensions[0] + TYLshift): int(right_dimensions[1]),
+                ]  # Left ROI
 
     return (
         Cs,
@@ -590,29 +594,28 @@ def Search_for_ticks(input_image_obj, Side, Left_dimensions, Right_dimensions):
         BCs,
         TYLshift,
         thresholded_image,
-        Side,
-        Left_dimensions,
-        Right_dimensions,
+        side,
+        left_dimensions,
+        right_dimensions,
         ROI2,
         ROI3,
     )
 
 
-def Search_for_labels(
-    Cs,
-    ROIAX,
-    CenPoints,
-    onY,
-    BCs,
-    TYLshift,
-    Side,
-    Left_dimensions,
-    Right_dimensions,
-    input_image_obj,
-    ROI2,
-    ROI3,
+def search_for_labels(
+        Cs,
+        ROIAX,
+        CenPoints,
+        onY,
+        BCs,
+        TYLshift,
+        Side,
+        Left_dimensions,
+        Right_dimensions,
+        input_image_obj,
+        ROI2,
+        ROI3,
 ):
-    
     """
     Searches for labels within specified regions of an image, extracts text,
     and attempts to associate it with the nearest tick marks.
@@ -647,21 +650,21 @@ def Search_for_labels(
             - **positions** (list): A list of positions of the label values.
             - **empty_to_fill** (ndarray): A array showing bounding boxes on image.
     """
-    
-    for thresh_value in np.arange(100, 190, 5): # Threshold to optimise the resulting text extraction.
+
+    for thresh_value in np.arange(100, 190, 5):  # Threshold to optimise the resulting text extraction.
         image = input_image_obj
         input_image_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         ret, thresholded_image = cv2.threshold(input_image_gray, thresh_value, 255, 0)
         if Side == "Left":
             ROIAX = thresholded_image[
-                int(Left_dimensions[2]) : int(Left_dimensions[3]),
-                int(Left_dimensions[0]) : int(Left_dimensions[0] + TYLshift),
-            ]  # Right ROI
+                    int(Left_dimensions[2]): int(Left_dimensions[3]),
+                    int(Left_dimensions[0]): int(Left_dimensions[0] + TYLshift),
+                    ]  # Right ROI
         elif Side == "Right":
             ROIAX = thresholded_image[
-                int(Right_dimensions[2]) : int(Right_dimensions[3]),
-                int(Right_dimensions[0] + TYLshift) : int(Right_dimensions[1]),
-            ]  # Left ROI
+                    int(Right_dimensions[2]): int(Right_dimensions[3]),
+                    int(Right_dimensions[0] + TYLshift): int(Right_dimensions[1]),
+                    ]  # Left ROI
 
         extracted_text_data = pytesseract.image_to_data(
             ROIAX,
@@ -730,7 +733,7 @@ def Search_for_labels(
     for i in range(0, len(CenBox)):
         dists = cdist([CenBox[i]], CenBox)
         dists[0][i] = dists.max()
-        if dists.min() < 20: # detect if characters are too close - but what if they are?
+        if dists.min() < 20:  # detect if characters are too close - but what if they are?
             logger.warning("Characters too close")
 
     try:
@@ -874,7 +877,6 @@ def Search_for_labels(
         pattern = r'(-?\d+)-$'
         return re.sub(pattern, r'\1', s)
 
-
     number = []
     for i in range(len(extracted_text_data["text"])):
         if extracted_text_data["text"][i] != "" and extracted_text_data["text"][i] != "-":
@@ -884,19 +886,19 @@ def Search_for_labels(
 
     if Side == "Left":
         empty_to_fill[
-            int(Left_dimensions[2]) : int(Left_dimensions[3]),
-            int(Left_dimensions[0]) : int(Left_dimensions[1]),
+        int(Left_dimensions[2]): int(Left_dimensions[3]),
+        int(Left_dimensions[0]): int(Left_dimensions[1]),
         ] = ROI3  # Right ROI
     elif Side == "Right":
         empty_to_fill[
-            int(Right_dimensions[2]) : int(Right_dimensions[3]),
-            int(Right_dimensions[0]) : int(Right_dimensions[1]),
+        int(Right_dimensions[2]): int(Right_dimensions[3]),
+        int(Right_dimensions[0]): int(Right_dimensions[1]),
         ] = ROI3  # Left ROI
 
     return ROIAX, number, positions, empty_to_fill
 
 
-def Plot_Digitized_data(Rticks, Rlocs, Lticks, Llocs, top_curve_coords):
+def plot_digitized_data(Rticks, Rlocs, Lticks, Llocs, top_curve_coords):
     """
     Digitize and plot the data.
 
@@ -934,8 +936,7 @@ def Plot_Digitized_data(Rticks, Rlocs, Lticks, Llocs, top_curve_coords):
     #We will have problems if the right axes only has 1 tick and that tick is equal to the minimum on the left axis
     if len(Rticks) == 1:
         Rticks.append(Lticks[-1])
-        Rlocs.append([Rlocs[-1][0],Llocs[-1][1]])
-
+        Rlocs.append([Rlocs[-1][0], Llocs[-1][1]])
 
     Rticks = list(map(int, Rticks))
     XmaxtickR = max(Rticks)
@@ -972,8 +973,8 @@ def Plot_Digitized_data(Rticks, Rlocs, Lticks, Llocs, top_curve_coords):
     b = pd.DataFrame(b).groupby(0, as_index=False)[1].mean().values.tolist()
     b = [x[::-1] for x in b]
 
-    X = [XminL, XmaxR]  
-    Y = [YminL, YmaxR] 
+    X = [XminL, XmaxR]
+    Y = [YminL, YmaxR]
 
     for i in range(0, len(b)):
         if b[i][1] >= XminL + 20 and b[i][1] <= XmaxR - 20:
@@ -1001,7 +1002,7 @@ def Plot_Digitized_data(Rticks, Rlocs, Lticks, Llocs, top_curve_coords):
 
     # Inverts the waveform if need be
     if np.mean(Yplot) < 0:
-        Yplot = [ y * (-1) for y in Yplot]
+        Yplot = [y * (-1) for y in Yplot]
 
     plt.figure(2)
     plt.plot(Xplot, Yplot, "-")
@@ -1010,7 +1011,7 @@ def Plot_Digitized_data(Rticks, Rlocs, Lticks, Llocs, top_curve_coords):
     return Xplot, Yplot, Ynought
 
 
-def Plot_correction(Xplot, Yplot, df):
+def plot_correction(Xplot, Yplot, df):
     """
     Adjusts and corrects the digitized waveform data using extracted text data, identifies
     and filters peaks and troughs, computes hemodynamic parameters, scales the time axis,
@@ -1057,7 +1058,7 @@ def Plot_correction(Xplot, Yplot, df):
         valid_peaks = []
         for i in range(len(peaks)):
             if widths_of_peaks[i] > (mean_widths_peaks / 2) and y[peaks[i]] > (
-                statistics.mean(y[peaks]) * 0.8
+                    statistics.mean(y[peaks]) * 0.8
             ):
                 valid_peaks.append(peaks[i])
         peaks = valid_peaks
@@ -1070,14 +1071,14 @@ def Plot_correction(Xplot, Yplot, df):
         SoverD = statistics.mean(y[peaks]) / statistics.mean(y[troughs])
         # Find RI
         RI = (
-            statistics.mean(y[peaks]) - statistics.mean(y[troughs])
-        ) / statistics.mean(y[peaks])
+                     statistics.mean(y[peaks]) - statistics.mean(y[troughs])
+             ) / statistics.mean(y[peaks])
         # Find TAmax
         TAmax = (statistics.mean(y[peaks]) + (2 * statistics.mean(y[troughs]))) / 3
         # Find PI
         PI = (
-            statistics.mean(y[peaks]) - statistics.mean(y[troughs])
-        ) / statistics.mean(y)
+                     statistics.mean(y[peaks]) - statistics.mean(y[troughs])
+             ) / statistics.mean(y)
 
         words = ["PS", "ED", "S/D", "RI", "TA"]
         values = [PS, ED, SoverD, RI, TAmax]
@@ -1102,7 +1103,7 @@ def Plot_correction(Xplot, Yplot, df):
     try:
         # Period of the signal in real time scale from text extraction
         real_period = 1 / (
-            df.loc[df["Word"].str.contains("HR"), "Value"].values[0] / 60
+                df.loc[df["Word"].str.contains("HR"), "Value"].values[0] / 60
         )
         # Calculate a scaling factor
         scale_factor = real_period / arbitrary_period
@@ -1125,7 +1126,7 @@ def Plot_correction(Xplot, Yplot, df):
     return df
 
 
-def Scan_type_test(input_image_filename):
+def scan_type_test(input_image_filename):
     """
     Function for yellow filtering an image and searching for a list of target words indicative of
     a doppler ultrasound scan taken using the Voluson E8, RAB6-D.
@@ -1209,19 +1210,19 @@ def Scan_type_test(input_image_filename):
     for target in target_words:
         for word in lines:
             if target in word:
-                Fail = 0 # If any of the words are found, then no fail.
+                Fail = 0  # If any of the words are found, then no fail.
 
     return Fail, df  # Return the fail variable and dataframe contraining extracted text.
 
 
-def Annotate(
-    input_image_obj,
-    refined_segmentation_mask,
-    Left_dimensions,
-    Right_dimensions,
-    Waveform_dimensions,
-    Left_axis,
-    Right_axis,
+def annotate(
+        input_image_obj,
+        refined_segmentation_mask,
+        Left_dimensions,
+        Right_dimensions,
+        Waveform_dimensions,
+        Left_axis,
+        Right_axis,
 ):
     """
     Visual aid for evaluating segmentation.
@@ -1305,7 +1306,7 @@ def Annotate(
     return img_RGB
 
 
-def Colour_extract(input_image_obj, TargetRGB, cyl_length, cyl_radius):
+def colour_extract(input_image_obj, TargetRGB, cyl_length, cyl_radius):
     """Extract target colours from image.
     
     **The `Colour_extract()` function is deprecated and has been replaced by the function `Colour_extract_vectorised()`.**
@@ -1341,7 +1342,7 @@ def Colour_extract(input_image_obj, TargetRGB, cyl_length, cyl_radius):
         c2 = channel + 2 if channel + 2 < len(rgb_vec) else channel + 2 - len(rgb_vec)
         img_cross += (rgb_vec[c1] * img[:, :, c2] - rgb_vec[c2] * img[:, :, c1]) ** 2
     distance_to_axis = np.sqrt(img_cross) / mag
-    
+
     mask = np.logical_and(
         np.logical_and(img_dot <= max_mag, img_dot >= min_mag),
         distance_to_axis <= cyl_radius,
@@ -1349,7 +1350,8 @@ def Colour_extract(input_image_obj, TargetRGB, cyl_length, cyl_radius):
 
     return Image.fromarray(mask).convert("RGB")
 
-def appendSpherical_1point(xyz):
+
+def append_spherical_1point(xyz):
     """
     Appends spherical coordinates to a 3D point in Cartesian coordinates.
 
@@ -1375,7 +1377,8 @@ def appendSpherical_1point(xyz):
     ptsnew[6] = np.arcsin(np.divide(ptsnew[2], ptsnew[4])) * (180 / math.pi)  # alpha
     return ptsnew
 
-def Colour_extract_vectorized(input_image_obj, TargetRGB, cyl_length, cyl_radius):
+
+def colour_extract_vectorized(input_image_obj, TargetRGB, cyl_length, cyl_radius):
     """
     Extracts a specified color from an image using a cylindrical filter in RGB space.
 
@@ -1396,7 +1399,7 @@ def Colour_extract_vectorized(input_image_obj, TargetRGB, cyl_length, cyl_radius
     """
     # Convert the target RGB color to spherical coordinates
     targ = np.array(TargetRGB)
-    out2 = appendSpherical_1point(targ)
+    out2 = append_spherical_1point(targ)
 
     # Calculate the coordinates of the cylinder in RGB space
     H2 = cyl_length
@@ -1437,10 +1440,11 @@ def Colour_extract_vectorized(input_image_obj, TargetRGB, cyl_length, cyl_radius
 
     # Convert the numpy array back to an image for the final output
     output_image = Image.fromarray(np.uint8(output_array)).convert("RGB")
-    
+
     return output_image
 
-def Text_from_greyscale(input_image_obj, COL):
+
+def text_from_greyscale(input_image_obj, COL):
     """
     Extracts and processes text from a greyscale image using OCR (Optical Character Recognition).
     
@@ -1466,7 +1470,6 @@ def Text_from_greyscale(input_image_obj, COL):
     PIX = COL.load()
     img = input_image_obj
 
-
     from PIL import ImageFilter
     import numpy as np
     from scipy.ndimage import binary_dilation
@@ -1475,25 +1478,24 @@ def Text_from_greyscale(input_image_obj, COL):
     #smoothed_image = COL.filter(ImageFilter.GaussianBlur(radius=1)) # In some cases smoothing helps, in others it makes it worse?
 
     for y in range(
-        int(COL.size[1] * 0.45), COL.size[1]
+            int(COL.size[1] * 0.45), COL.size[1]
     ):  # Exclude bottom 3rd of image - these are fails
         for x in range(COL.size[0]):
             PIX[x, y] = (0, 0, 0)
 
-
-    pixels = COL#np.array(smoothed_image)
+    pixels = COL  #np.array(smoothed_image)
     data = pytesseract.image_to_data(
         pixels, output_type=Output.DICT, lang="eng", config="--oem 1 --psm 3 -c tessedit_char_blacklist=l,!_|=$"
     )
     if (
-        len(data["text"]) < 30
+            len(data["text"]) < 30
     ):  # This is rough, if more than 30 objects found then highly likley it is a waveform scan.
         Fail = 1  # logical, keep scan or not
     else:
         Fail = 0
 
     # Loop through each word and draw a box around it
-    y_center = np.zeros(len(data["text"])) # Variable to store the y-center of each bounding box of text detected.
+    y_center = np.zeros(len(data["text"]))  # Variable to store the y-center of each bounding box of text detected.
     for i in range(len(data["text"])):
         if data["text"][i] != '' and data["text"][i] != ' ':
             x = data["left"][i]
@@ -1502,12 +1504,12 @@ def Text_from_greyscale(input_image_obj, COL):
             h = data["height"][i]
             if int(data["conf"][i]) > -1:
                 cv2.rectangle(img, (x, y), (x + w, y + h), (0, 0, 255), 2)
-                y_center[i] = y + (h/2)
+                y_center[i] = y + (h / 2)
             else:
-                y_center[i] = 0  
+                y_center[i] = 0
         else:
             y_center[i] = 0
-        
+
     def group_similar_numbers(y_center, tolerance, OCR_data):
         # This function groups indexes of words with similar y-coordinate center
         # and also calculates the bounding box for each group of words
@@ -1516,7 +1518,7 @@ def Text_from_greyscale(input_image_obj, COL):
         tops = OCR_data["top"]
         widths = OCR_data["width"]
         heights = OCR_data["height"]
-        x_centers = [left + width / 2 for left, width in zip(lefts, widths)] # Calculate x_center for sorting
+        x_centers = [left + width / 2 for left, width in zip(lefts, widths)]  # Calculate x_center for sorting
 
         # Convert y_center to a numpy array and reshape for DBSCAN
         data = np.array(y_center).reshape(-1, 1)
@@ -1557,17 +1559,15 @@ def Text_from_greyscale(input_image_obj, COL):
 
         return grouped_words, bounding_boxes
 
-
-
     tolerance = 5  # Adjust the tolerance value - the max difference between y-coords considered on the same line
     grouped_words, bounding_boxes = group_similar_numbers(y_center, tolerance, data)
 
     # The bounding box is expected in the form of (left, upper, right, lower)
     left, top = bounding_boxes[1]['top_left']
     right, bottom = bounding_boxes[1]['bottom_right']
-    crop_box = (left - 1, top -1, right + 1, bottom - 1)
+    crop_box = (left - 1, top - 1, right + 1, bottom - 1)
     cropped_image = COL.crop(crop_box)
-    
+
     # def increase_dpi(image, factor=2):
     #     """Increases the DPI of an image by a factor
 
@@ -1687,9 +1687,9 @@ def Text_from_greyscale(input_image_obj, COL):
         "DV-PVIV",
         "DV-HR",
     ]
-    
+
     # Split text into lines
-    lines = grouped_words #text.split("\n")
+    lines = grouped_words  #text.split("\n")
     # Initialize DataFrame
     df = pd.DataFrame(columns=["Line", "Word", "Value", "Unit"])
 
@@ -1728,27 +1728,25 @@ def Text_from_greyscale(input_image_obj, COL):
                 matched_lines.add(i)
                 break  # Exit the inner loop once a match is found
 
-
     def is_subsequence(target, line):
         target_idx = 0
         line_idx = 0
-        
+
         # Filter out spaces and hyphens from target
         filtered_target = [char for char in target if char not in [' ', '-']]
-        
+
         while target_idx < len(filtered_target) and line_idx < len(line):
             if filtered_target[target_idx].lower() == line[line_idx].lower():
                 target_idx += 1
             line_idx += 1
 
         return target_idx == len(filtered_target)
-    
 
     # Step 2: Subsequence matching for unmatched lines
     for i, line in enumerate(lines):
         if i not in matched_lines:  # only process unmatched lines
             for word in target_words:
-                if is_subsequence(word, line): 
+                if is_subsequence(word, line):
                     # Extract value and unit
                     match = re.search(r"(\-?\d+\.\d+|\-?\d+)\s*([^\d\s]+)?$", line)
                     if match:
@@ -1769,19 +1767,18 @@ def Text_from_greyscale(input_image_obj, COL):
                     matched_lines.add(i)
                     break  # Exit the inner loop once a match is found
 
-    
     import Levenshtein
 
     def find_closest_target(line, target_words):
         min_distance = float('inf')
         closest_word = None
-        
+
         for word in target_words:
             distance = Levenshtein.distance(line, word)
             if distance < min_distance:
                 min_distance = distance
                 closest_word = word
-                
+
         return closest_word, min_distance
 
     # Set a threshold for acceptable similarity
@@ -1790,7 +1787,7 @@ def Text_from_greyscale(input_image_obj, COL):
     for i, line in enumerate(lines):
         if i not in matched_lines:  # only process unmatched lines
             closest_word, distance = find_closest_target(line, target_words)
-            
+
             if distance <= threshold:
                 # Extract value and unit
                 match = re.search(r"(\-?\d+(\s*\d+)*\.\s*\d+|\-?\d+(\s*\d+)*)\s*([^\d\s]+)?$", line)
@@ -1801,7 +1798,7 @@ def Text_from_greyscale(input_image_obj, COL):
                         {"Line": i + 1, "Word": closest_word, "Value": value, "Unit": unit},
                         ignore_index=True,
                     )
-                    target_words.remove(closest_word) 
+                    target_words.remove(closest_word)
                 matched_lines.add(i)
 
     from Levenshtein import distance
@@ -1843,7 +1840,6 @@ def Text_from_greyscale(input_image_obj, COL):
         "DV-HR bpm",
     ]
 
-
     if target_words:
 
         suffixes = [word.split('-')[-1] for word in target_words if '-' in word]
@@ -1859,7 +1855,6 @@ def Text_from_greyscale(input_image_obj, COL):
         # Create a list of bias values, all set to -2, with the same length as suffixes
         bias_values = [-2] * len(suffixes)  # Creates a list with -2 repeated len(suffixes) times
 
-
         # Bias dictionary, where the keys are suffixes and the values are the bias amounts
         bias_dict = {suffix: bias for suffix, bias in zip(suffixes, bias_values)}
 
@@ -1874,16 +1869,16 @@ def Text_from_greyscale(input_image_obj, COL):
                 for j, word in enumerate(remaining_target_extended):
                     # Remove digits from the line
                     line_no_digits = re.sub(r'\d+', '', line)
-                    
+
                     # Calculate basic Levenshtein distance
                     basic_distance = distance(line_no_digits, word)
-                    
+
                     # Apply bias if a specific suffix is expected in the line
                     expected_suffix = suffixes[j]  # Suffix that corresponds to the current target word
                     if expected_suffix in line:
                         # Subtract bias to reduce distance
                         basic_distance += bias_dict[expected_suffix]
-                    
+
                     # Set the biased distance in the matrix
                     distance_matrix[i, j] = basic_distance
 
@@ -1896,7 +1891,7 @@ def Text_from_greyscale(input_image_obj, COL):
                 line = lines[i]
                 # Add to matches
                 matches[line] = word
-                
+
                 # Extract value and unit from the line and add to the DataFrame
                 match = re.search(r"(\-?\d+(\s*\d+)*\.\s*\d+|\-?\d+(\s*\d+)*)\s*([^\d\s]+)?$", line)
                 if match:
@@ -1912,24 +1907,24 @@ def Text_from_greyscale(input_image_obj, COL):
                         ignore_index=True,
                     )
                 matched_lines.add(i)
-                
+
                 # Remove the matched line from further consideration
                 distance_matrix[i, :] = np.inf
-
 
     # Create a mask for each word in the word_order list and concatenate them in order
     df = pd.concat([df.loc[df['Word'] == word] for word in word_order]).reset_index(drop=True)
 
-    try: # This is still a test really
+    try:  # This is still a test really
         if most_likely_prefix == "DV":
 
-            if df.loc[df['Word'] == 'DV-D', 'Value'].values[0] > df.loc[df['Word'] == 'DV-S', 'Value'].values[0] and df.loc[df['Word'] == 'DV-S/a', 'Value'].values[0] > df.loc[df['Word'] == 'DV-S', 'Value'].values[0] and df.loc[df['Word'] == 'DV-S/a', 'Unit'].values[0] != '':
+            if df.loc[df['Word'] == 'DV-D', 'Value'].values[0] > df.loc[df['Word'] == 'DV-S', 'Value'].values[0] and df.loc[df['Word'] == 'DV-S/a', 'Value'].values[0] > \
+                    df.loc[df['Word'] == 'DV-S', 'Value'].values[0] and df.loc[df['Word'] == 'DV-S/a', 'Unit'].values[0] != '':
                 # Storing temporary values for swapping
                 temp = df.loc[df['Word'] == 'DV-S/a', 'Value'].values[0]
                 df.loc[df['Word'] == 'DV-S/a', 'Value'] = df.loc[df['Word'] == 'DV-S', 'Value'].values[0]
                 df.loc[df['Word'] == 'DV-S', 'Value'] = temp
                 print("swapped DV-S/a and DV-S")
-            
+
             if df.loc[df['Word'] == 'DV-a/S', 'Unit'].values[0] != '' and df.loc[df['Word'] == 'DV-a', 'Unit'].values[0] == '':
                 # Storing temporary values for swapping
                 temp = df.loc[df['Word'] == 'DV-a/S', 'Value'].values[0]
@@ -1938,16 +1933,17 @@ def Text_from_greyscale(input_image_obj, COL):
                 df.loc[df['Word'] == 'DV-a/S', 'Unit'] = df.loc[df['Word'] == 'DV-a', 'Unit'].values[0]
                 df.loc[df['Word'] == 'DV-a', 'Value'] = temp
                 df.loc[df['Word'] == 'DV-a', 'Unit'] = temp_unit
-            
-            df  = Metric_check_DV(df) # handle the ductus venousus differently
+
+            df = metric_check_dv(df)  # handle the ductus venousus differently
         else:
-            df = Metric_check(df) # for left, right, and umbilical
+            df = metric_check(df)  # for left, right, and umbilical
     except:
         print("metric check failed")
 
     return Fail, df
 
-def Metric_check(df):
+
+def metric_check(df):
     """Performs validation and correction of ultrasound measurement metrics within a DataFrame.
 
     This function identifies the prefix used in the metrics (either left, right, or uterine artery),
@@ -1958,21 +1954,20 @@ def Metric_check(df):
     over diastolic ratio (S/D), resistance index (RI), and TAmax from the corrected PS and ED 
     values and checks them against the extracted metrics for consistency.
 
+    Args:
+        - **df** (DataFrame): Extracted data from image
 
-	Args:
-		- **df** (DataFrame): Extracted data from image
+    Returns:
+        - df (DataFrame): DataFrame with corrected values after metric checking calculations
+    """
 
-	Returns:
-		- df (DataFrame): DataFrame with corrected values after metric checking calculations
-	"""
-        
     def identify_prefix(lines):
         # Try to identify the prefix in use
         for prefix in ["Lt", "Rt", "Umb"]:
             if lines['Word'].str.contains(prefix).any():
                 print("prefix found")
                 PRF = prefix
-                    
+
             target_words = [
                 "Lt Ut-PS",
                 "Lt Ut-ED",
@@ -2007,22 +2002,21 @@ def Metric_check(df):
     def add_missing_rows(df):
         # Identify the Prefix
         prefix, target_words = identify_prefix(df)
-        
+
         # Determine Missing Rows
         existing_words = df['Word'].tolist()
         missing_targets = [word for word in target_words if word not in existing_words]
-        
+
         # Add Missing Rows
         for target in missing_targets:
             new_row = {"Word": target, "Value": 0, "Unit": ""}
             df = df._append(new_row, ignore_index=True)
-        
+
         return df
 
     df = add_missing_rows(df)
 
-
-    def check_PI_value(value): # Decimal can be misread, so common sense check.
+    def check_PI_value(value):  # Decimal can be misread, so common sense check.
         # If the value is between 0 and 2, return it as is
         if 0 <= value <= 3:
             return value
@@ -2037,12 +2031,12 @@ def Metric_check(df):
 
         # If the value is outside of these ranges, return a default or handle accordingly
         return value  # or return some default value or raise an exception
-    
-    def check_TAmax_value(value,df): # Decimal can be misread, so common sense check.
+
+    def check_TAmax_value(value, df):  # Decimal can be misread, so common sense check.
 
         MD = df.loc[df['Word'].str.contains('MD'), 'Value'].values[0] if df['Word'].str.contains('MD').any() else 0
         PS = df.loc[df['Word'].str.contains('PS'), 'Value'].values[0] if df['Word'].str.contains('PS').any() else 0
-        ED = df.loc[df['Word'].str.contains('ED'), 'Value'].values[0] if df['Word'].str.contains('ED').any() else 0 
+        ED = df.loc[df['Word'].str.contains('ED'), 'Value'].values[0] if df['Word'].str.contains('ED').any() else 0
 
         # If the other values are positive, return the absolute value of TAmax
         if value < 0 and MD > 0 and PS > 0 and ED > 0:
@@ -2078,24 +2072,23 @@ def Metric_check(df):
         EDnew = ED
         # If the value is between 3 and 10, divide it by 10
         if 250 <= PS <= 1000:
-            PSnew = PS/ 10
+            PSnew = PS / 10
 
         # If the value is between 10 and 200, divide it by 100
         if 1000 <= PS <= 10000:
-            PSnew = PS/ 100
-        
+            PSnew = PS / 100
+
         # If the value is between 3 and 10, divide it by 10
         if 200 <= ED <= 1000:
-            EDnew = ED/ 10
+            EDnew = ED / 10
 
         # If the value is between 10 and 200, divide it by 100
         if 1000 <= ED <= 10000:
-            EDnew = ED/ 100
-
+            EDnew = ED / 100
 
         return PSnew, EDnew
 
-    PS, ED = check_TAmax_value(PS, ED, df) # sense check for pressures
+    PS, ED = check_TAmax_value(PS, ED, df)  # sense check for pressures
     df.loc[df['Word'].str.contains('PS'), 'Value'] = PS
     df.loc[df['Word'].str.contains('ED'), 'Value'] = ED
 
@@ -2111,10 +2104,10 @@ def Metric_check(df):
     SoverD_extracted = df.loc[df['Word'].str.contains('S/D'), 'Value'].values[0] if df['Word'].str.contains('S/D').any() else None
     RI_extracted = df.loc[df['Word'].str.contains('RI'), 'Value'].values[0] if df['Word'].str.contains('RI').any() else None
     TAmax_extracted = df.loc[df['Word'].str.contains('TAmax'), 'Value'].values[0] if df['Word'].str.contains('TAmax').any() else None
-    comparison_dataframe = pd.DataFrame(index=['PS_extracted','ED_extracted','SoverD_extracted','RI_extracted','TAmax_extracted',
-                                               'SoverD_calc','RI_calc','TAmax_calc','PS_calc','ED_calc','ED_from_SoverD','ED_from_RI',
-                                               'SoverD_from_ED_from_RI','RI_from_ED_from_SoverD','TAmax_from_ED_from_SoverD','TAmax_from_ED_from_RI',
-                                               'PS_from_SoverD','PS_from_RI','SoverD_from_PS_from_RI','RI_from_PS_from_SoverD','TAmax_from_PS_from_SoverD',
+    comparison_dataframe = pd.DataFrame(index=['PS_extracted', 'ED_extracted', 'SoverD_extracted', 'RI_extracted', 'TAmax_extracted',
+                                               'SoverD_calc', 'RI_calc', 'TAmax_calc', 'PS_calc', 'ED_calc', 'ED_from_SoverD', 'ED_from_RI',
+                                               'SoverD_from_ED_from_RI', 'RI_from_ED_from_SoverD', 'TAmax_from_ED_from_SoverD', 'TAmax_from_ED_from_RI',
+                                               'PS_from_SoverD', 'PS_from_RI', 'SoverD_from_PS_from_RI', 'RI_from_PS_from_SoverD', 'TAmax_from_PS_from_SoverD',
                                                'TAmax_from_PS_from_RI'], columns=['Extracted'])
     # List of all the extracted metrics that exist
     existing_metrics = [metric for metric in [SoverD_extracted, RI_extracted, TAmax_extracted] if metric is not None]
@@ -2139,16 +2132,15 @@ def Metric_check(df):
         comparison_dataframe.loc[key, 'First_calc'] = value
         # Check closeness and store conditions met in a list
 
-
-    def Metric_comparison(c_df,col):
+    def Metric_comparison(c_df, col):
 
         # Tolerance level (you can adjust this based on your requirements)
         tolerance1 = 0.2
-        tolerance2 = 4 # This tolerance is larger because the equation we used for TAmax is approximate
+        tolerance2 = 4  # This tolerance is larger because the equation we used for TAmax is approximate
         conditions_met = []
         for parameter, extracted_name in [('SoverD', 'SoverD_extracted'), ('RI', 'RI_extracted'), ('TAmax', 'TAmax_extracted')]:
             extracted_value = c_df['Extracted'][extracted_name]
-            
+
             if extracted_value is not None:
                 for row_name, calc_value in c_df.iloc[:, col].items():
                     if str(row_name).startswith(extracted_name[:-9]):  # If row name starts with the parameter name
@@ -2159,7 +2151,7 @@ def Metric_check(df):
 
         return conditions_met
 
-    conditions_met = Metric_comparison(comparison_dataframe,1)
+    conditions_met = Metric_comparison(comparison_dataframe, 1)
 
     # You've already extracted PS, SoverD_extracted, RI_extracted, and TAmax_extracted
 
@@ -2189,10 +2181,9 @@ def Metric_check(df):
                 # Check closeness and store conditions met in a list
 
             # Check conditions met with these values:
-            conditions_met = Metric_comparison(comparison_dataframe,2)
+            conditions_met = Metric_comparison(comparison_dataframe, 2)
 
-
-            if len(conditions_met) == 0 or (ED_from_RI<2 and ED_from_SoverD<2): # If our assumption above was wrong
+            if len(conditions_met) == 0 or (ED_from_RI < 2 and ED_from_SoverD < 2):  # If our assumption above was wrong
                 # Recalculate PS using the extracted metrics and assumed correct ED
                 PS_from_SoverD = SoverD_extracted * ED if SoverD_extracted else None
                 PS_from_RI = ED / (1 - RI_extracted) if RI_extracted else None
@@ -2214,45 +2205,44 @@ def Metric_check(df):
                     comparison_dataframe.loc[key, 'Third_calc'] = value
                     # Check closeness and store conditions met in a list
 
-                conditions_met = Metric_comparison(comparison_dataframe,3)
+                conditions_met = Metric_comparison(comparison_dataframe, 3)
                 # now check the conditions again:
-                if len(conditions_met)>0:
-
+                if len(conditions_met) > 0:
                     row_name = conditions_met[0]
 
                     parts = row_name.split('_from_')
                     desired_row_name = parts[1] + '_from_' + parts[2]
-                    new_value = comparison_dataframe.loc[desired_row_name, 'Third_calc'] 
+                    new_value = comparison_dataframe.loc[desired_row_name, 'Third_calc']
                     # We have calculated the new PS!
                     print(f"Recalculated PS (from RI): {new_value}")
-                    df.loc[df['Word'].str.contains('PS'), 'Value'] = round(new_value,2)
+                    df.loc[df['Word'].str.contains('PS'), 'Value'] = round(new_value, 2)
                     PS = df.loc[df['Word'].str.contains('PS'), 'Value'].values[0]
                     ED = df.loc[df['Word'].str.contains('ED'), 'Value'].values[0]
                     # Find S/D
-                    df.loc[df['Word'].str.contains('S/D'), 'Value'] =  round(PS / ED,2)
+                    df.loc[df['Word'].str.contains('S/D'), 'Value'] = round(PS / ED, 2)
                     # Find RI
-                    df.loc[df['Word'].str.contains('RI'), 'Value'] = round((PS - ED) / PS,2)
+                    df.loc[df['Word'].str.contains('RI'), 'Value'] = round((PS - ED) / PS, 2)
                     # Find TAmax
-                    df.loc[df['Word'].str.contains('TAmax'), 'Value'] = round((PS + (2 * ED)) / 3,2)
+                    df.loc[df['Word'].str.contains('TAmax'), 'Value'] = round((PS + (2 * ED)) / 3, 2)
 
-            elif len(conditions_met)>0:
+            elif len(conditions_met) > 0:
 
-                    row_name = conditions_met[0]
+                row_name = conditions_met[0]
 
-                    parts = row_name.split('_from_')
-                    desired_row_name = parts[1] + '_from_' + parts[2]
-                    new_value = comparison_dataframe.loc[desired_row_name, 'Second_calc'] 
-                    # We have calculated the new PS!
-                    print(f"Recalculated PS (from RI): {new_value}")
-                    df.loc[df['Word'].str.contains('ED'), 'Value'] = round(new_value,2)
-                    PS = df.loc[df['Word'].str.contains('PS'), 'Value'].values[0]
-                    ED = df.loc[df['Word'].str.contains('ED'), 'Value'].values[0]
-                    # Find S/D
-                    df.loc[df['Word'].str.contains('S/D'), 'Value'] =  round(PS / ED,2)
-                    # Find RI
-                    df.loc[df['Word'].str.contains('RI'), 'Value'] = round((PS - ED) / PS,2)
-                    # Find TAmax
-                    df.loc[df['Word'].str.contains('TAmax'), 'Value'] = round((PS + (2 * ED)) / 3,2)
+                parts = row_name.split('_from_')
+                desired_row_name = parts[1] + '_from_' + parts[2]
+                new_value = comparison_dataframe.loc[desired_row_name, 'Second_calc']
+                # We have calculated the new PS!
+                print(f"Recalculated PS (from RI): {new_value}")
+                df.loc[df['Word'].str.contains('ED'), 'Value'] = round(new_value, 2)
+                PS = df.loc[df['Word'].str.contains('PS'), 'Value'].values[0]
+                ED = df.loc[df['Word'].str.contains('ED'), 'Value'].values[0]
+                # Find S/D
+                df.loc[df['Word'].str.contains('S/D'), 'Value'] = round(PS / ED, 2)
+                # Find RI
+                df.loc[df['Word'].str.contains('RI'), 'Value'] = round((PS - ED) / PS, 2)
+                # Find TAmax
+                df.loc[df['Word'].str.contains('TAmax'), 'Value'] = round((PS + (2 * ED)) / 3, 2)
 
 
         except ZeroDivisionError:
@@ -2264,20 +2254,18 @@ def Metric_check(df):
 
         if 'SoverD' not in conditions_met:
             # Find S/D
-            df.loc[df['Word'].str.contains('S/D'), 'Value'] =  round(PS / ED,2)
+            df.loc[df['Word'].str.contains('S/D'), 'Value'] = round(PS / ED, 2)
         if 'RI' not in conditions_met:
             # Find RI
-            df.loc[df['Word'].str.contains('RI'), 'Value'] = round((PS - ED) / PS,2)
+            df.loc[df['Word'].str.contains('RI'), 'Value'] = round((PS - ED) / PS, 2)
         if 'TAmax' not in conditions_met:
             # Find TAmax
-            df.loc[df['Word'].str.contains('TAmax'), 'Value'] = round((PS + (2 * ED)) / 3,2)
+            df.loc[df['Word'].str.contains('TAmax'), 'Value'] = round((PS + (2 * ED)) / 3, 2)
     else:
         print("All metrics are consistent.")
 
-
-
-
     return df
+
 
 def upscale_both_images(PIL_img, cv2_img, max_length=950, min_length=950):
     """ **For testing improved text extraction**
@@ -2330,9 +2318,10 @@ def upscale_both_images(PIL_img, cv2_img, max_length=950, min_length=950):
 
     return upscaled_PIL_img, upscaled_cv2_img
 
-def Metric_check_DV(df):
+
+def metric_check_dv(df):
     """
-	Performs validation and correction of ultrasound measurement metrics within a DataFrame
+    Performs validation and correction of ultrasound measurement metrics within a DataFrame
     for Ductus Venosus (DV).
 
     This function performs the same function as Metric_check, but for Ductus Venosus. Metric_check
@@ -2340,44 +2329,42 @@ def Metric_check_DV(df):
     but DV scans have a seperate set of measurements with their own unique relationship - this function
     corrects the values for DV scans.
 
-	Args:
-		df (DataFrame): Extracted data from image
+    Args:
+        df (DataFrame): Extracted data from image
 
-	Returns:
-		df(DataFrame): DataFrame with corrected values after metric checking calculations
-	"""
+    Returns:
+        df(DataFrame): DataFrame with corrected values after metric checking calculations
+    """
 
     # Splitting the target words based on prefixes
-
     def add_missing_rows(df):
         # Identify the Prefix
         prefix = "DV"
 
         target_words = ["DV-S",
-        "DV-D",
-        "DV-a",
-        "DV-TAmax",
-        "DV-S/a",
-        "DV-a/S",
-        "DV-PI",
-        "DV-PLI",
-        "DV-PVIV",
-        "DV-HR",]
+                        "DV-D",
+                        "DV-a",
+                        "DV-TAmax",
+                        "DV-S/a",
+                        "DV-a/S",
+                        "DV-PI",
+                        "DV-PLI",
+                        "DV-PVIV",
+                        "DV-HR", ]
         # Determine Missing Rows
         existing_words = df['Word'].tolist()
         missing_targets = [word for word in target_words if word not in existing_words]
-        
+
         # Add Missing Rows
         for target in missing_targets:
             new_row = {"Word": target, "Value": 0, "Unit": ""}
             df = df._append(new_row, ignore_index=True)
-        
+
         return df
 
     df = add_missing_rows(df)
 
-
-    def check_PI_value(value): # Decimal can be misread, so common sense check.
+    def check_PI_value(value):  # Decimal can be misread, so common sense check.
         # If the value is between 0 and 2, return it as is
         if 0 <= value <= 3:
             return value
@@ -2392,8 +2379,8 @@ def Metric_check_DV(df):
 
         # If the value is outside of these ranges, return a default or handle accordingly
         return value  # or return some default value or raise an exception
-    
-    def check_TAmax_value(value,df): # Decimal can be misread, so common sense check.
+
+    def check_TAmax_value(value, df):  # Decimal can be misread, so common sense check.
 
         PLI = df.loc[df['Word'] == 'DV-S/a', 'Value'].values[0]
         PS = df.loc[df['Word'] == 'DV-S', 'Value'].values[0]
@@ -2431,9 +2418,9 @@ def Metric_check_DV(df):
 
         return PS, ED
 
-    PS, ED = check_TAmax_value(PS, ED, df) # sense check for pressures
+    PS, ED = check_TAmax_value(PS, ED, df)  # sense check for pressures
 
-    def check_S_D_value(value): # Decimal can be misread, so common sense check.
+    def check_S_D_value(value):  # Decimal can be misread, so common sense check.
         # If the value is between 0 and 2, return it as is
         if 0 <= abs(value) <= 60:
             return value
@@ -2448,7 +2435,7 @@ def Metric_check_DV(df):
 
         # If the value is outside of these ranges, return a default or handle accordingly
         return value  # or return some default value or raise an exception
-    
+
     ED = check_S_D_value(ED)
     df.loc[df['Word'] == 'DV-S', 'Value'] = PS
     df.loc[df['Word'] == 'DV-D', 'Value'] = ED
@@ -2461,7 +2448,7 @@ def Metric_check_DV(df):
     # Find TAmax
     TAmax_calc = (PS + (2 * a)) / 3
     # Find PI
-    PI_calc = (PS - a) / ((PS + a)/2)
+    PI_calc = (PS - a) / ((PS + a) / 2)
 
     # Now check whether the PS & a dependant metrics are consistent between calculated and extracted:
     # Extracted values with default as None if not present
@@ -2469,10 +2456,10 @@ def Metric_check_DV(df):
     aoverS_extracted = df.loc[df['Word'] == 'DV-a/S', 'Value'].values[0]
     TAmax_extracted = df.loc[df['Word'] == 'DV-TAmax', 'Value'].values[0]
     PI_extracted = df.loc[df['Word'] == 'DV-PI', 'Value'].values[0]
-    comparison_dataframe = pd.DataFrame(index=['PS_extracted','a_extracted','Sovera_extracted','TAmax_extracted', 'PI_extracted',
-                                               'Sovera_calc','PI_calc','TAmax_calc','PS_calc','a_calc','a_from_Sovera','a_from_PI',
-                                               'Sovera_from_a_from_PI','PI_from_a_from_Sovera','TAmax_from_a_from_Sovera','TAmax_from_a_from_PI',
-                                               'PS_from_Sovera','PS_from_PI','Sovera_from_PS_from_PI','PI_from_PS_from_Sovera','TAmax_from_PS_from_Sovera',
+    comparison_dataframe = pd.DataFrame(index=['PS_extracted', 'a_extracted', 'Sovera_extracted', 'TAmax_extracted', 'PI_extracted',
+                                               'Sovera_calc', 'PI_calc', 'TAmax_calc', 'PS_calc', 'a_calc', 'a_from_Sovera', 'a_from_PI',
+                                               'Sovera_from_a_from_PI', 'PI_from_a_from_Sovera', 'TAmax_from_a_from_Sovera', 'TAmax_from_a_from_PI',
+                                               'PS_from_Sovera', 'PS_from_PI', 'Sovera_from_PS_from_PI', 'PI_from_PS_from_Sovera', 'TAmax_from_PS_from_Sovera',
                                                'TAmax_from_PS_from_PI'], columns=['Extracted'])
     # List of all the extracted metrics that exist
     existing_metrics = [metric for metric in [Sovera_extracted, PI_extracted, TAmax_extracted] if metric is not None]
@@ -2497,30 +2484,30 @@ def Metric_check_DV(df):
         comparison_dataframe.loc[key, 'First_calc'] = value
         # Check closeness and store conditions met in a list
 
-
-    def Metric_comparison(c_df,col):
+    def metric_comparison(c_df, col):
 
         # Tolerance level (you can adjust this based on your requirements)
         tolerance1 = 0.2
-        tolerance2 = 2 # This tolerance is larger because the equation we used for TAmax is approximate
-        conditions_met = []
+        tolerance2 = 2  # This tolerance is larger because the equation we used for TAmax is approximate
+        local_conditions_met = []
         for parameter, extracted_name in [('Sovera', 'Sovera_extracted'), ('PI', 'PI_extracted'), ('TAmax', 'TAmax_extracted')]:
             extracted_value = c_df['Extracted'][extracted_name]
-            
+
             if extracted_value is not None:
-                for row_name, calc_value in c_df.iloc[:, col].items():
-                    if str(row_name).startswith(extracted_name[:-9]) and np.isnan(calc_value) != True:  # If row name starts with the parameter name
+                for local_row_name, calc_value in c_df.iloc[:, col].items():
+                    if str(local_row_name).startswith(extracted_name[:-9]) and np.isnan(calc_value) != True:  # If row name starts with the parameter name
                         tolerance = tolerance1 if parameter != 'TAmax' else tolerance2
                         if abs(calc_value - extracted_value) < tolerance:
-                            conditions_met.append(row_name)
+                            local_conditions_met.append(local_row_name)
                             break  # Exit the inner loop once a match is found
 
-        return conditions_met
+        return local_conditions_met
 
     try:
-        conditions_met = Metric_comparison(comparison_dataframe,1)
+        conditions_met = metric_comparison(comparison_dataframe, 1)
         print("ok")
     except:
+        conditions_met = None
         traceback.print_exc()
 
     # You've already extracted PS, Sovera_extracted, RI_extracted, and TAmax_extracted
@@ -2534,7 +2521,7 @@ def Metric_check_DV(df):
             a_from_PI = PS * (1 - PI_extracted) if PI_extracted else None
             # Now, using these new a values, recalculate the metrics
             Sovera_from_a_from_PI = PS / a_from_PI if a_from_PI else None
-            PI_from_a_from_Sovera = (PS - a_from_Sovera) / ((PS + a_from_Sovera)/2) if a_from_Sovera else None 
+            PI_from_a_from_Sovera = (PS - a_from_Sovera) / ((PS + a_from_Sovera) / 2) if a_from_Sovera else None
             TAmax_from_a_from_Sovera = (PS + (2 * a_from_Sovera)) / 3 if a_from_Sovera else None
             TAmax_from_a_from_PI = (PS + (2 * a_from_PI)) / 3 if a_from_PI else None
 
@@ -2551,15 +2538,15 @@ def Metric_check_DV(df):
                 # Check closeness and store conditions met in a list
 
             # Check conditions met with these values:
-            conditions_met = Metric_comparison(comparison_dataframe,2)
-            if len(conditions_met) == 0: # If our assumption above was wrong
+            conditions_met = metric_comparison(comparison_dataframe, 2)
+            if len(conditions_met) == 0:  # If our assumption above was wrong
                 # Recalculate PS using the extracted metrics and assumed correct a
                 PS_from_Sovera = Sovera_extracted * a if Sovera_extracted else None
-                PS_from_PI = ((3*PI_extracted)-(2*a)) if PI_extracted else None
+                PS_from_PI = ((3 * PI_extracted) - (2 * a)) if PI_extracted else None
                 # Now, using these new PS values, recalculate the other metrics
                 Sovera_from_PS_from_PI = PS_from_PI / a if PS_from_PI else None
-                PI_from_PS_from_Sovera = (PS_from_Sovera - a) / ((PS_from_Sovera + a)/2) if PS_from_Sovera else None
-                TAmax_from_PS_from_Sovera =  (PS_from_Sovera + (2 * a)) / 3 if PS_from_Sovera else None
+                PI_from_PS_from_Sovera = (PS_from_Sovera - a) / ((PS_from_Sovera + a) / 2) if PS_from_Sovera else None
+                TAmax_from_PS_from_Sovera = (PS_from_Sovera + (2 * a)) / 3 if PS_from_Sovera else None
                 TAmax_from_PS_from_PI = (PS_from_PI + (2 * a)) / 3 if PS_from_PI else None
 
                 values_to_insert = {
@@ -2574,69 +2561,63 @@ def Metric_check_DV(df):
                     comparison_dataframe.loc[key, 'Third_calc'] = value
                     # Check closeness and store conditions met in a list
 
-                conditions_met = Metric_comparison(comparison_dataframe,3)
+                conditions_met = metric_comparison(comparison_dataframe, 3)
                 # now check the conditions again:
-                if len(conditions_met)>0:
-
+                if len(conditions_met) > 0:
                     row_name = conditions_met[0]
 
                     parts = row_name.split('_from_')
                     desired_row_name = parts[1] + '_from_' + parts[2]
-                    new_value = comparison_dataframe.loc[desired_row_name, 'Third_calc'] 
+                    new_value = comparison_dataframe.loc[desired_row_name, 'Third_calc']
                     # We have calculated the new PS!
                     print(f"Recalculated PS (from PI): {new_value}")
                     df.loc[df['Word'] == 'DV-S', 'Value'] = new_value
                     PS = df.loc[df['Word'] == 'DV-S', 'Value'].values[0]
                     a = df.loc[df['Word'] == 'DV-a', 'Value'].values[0]
                     # Find S/D
-                    df.loc[df['Word'] == 'DV-S/a', 'Value'] =  round(PS / a,2)
+                    df.loc[df['Word'] == 'DV-S/a', 'Value'] = round(PS / a, 2)
                     # Find PI
-                    df.loc[df['Word'] == 'DV-PI', 'Value'] = round((PS - a) / ((PS + a)/2),2)
+                    df.loc[df['Word'] == 'DV-PI', 'Value'] = round((PS - a) / ((PS + a) / 2), 2)
                     # Find TAmax
-                    df.loc[df['Word'] == 'DV-TAmax', 'Value'] = round((PS + (2 * a)) / 3,2)
+                    df.loc[df['Word'] == 'DV-TAmax', 'Value'] = round((PS + (2 * a)) / 3, 2)
 
-            elif len(conditions_met)>0:
+            elif len(conditions_met) > 0:
 
                 row_name = conditions_met[0]
 
                 parts = row_name.split('_from_')
                 desired_row_name = parts[1] + '_from_' + parts[2]
-                new_value = comparison_dataframe.loc[desired_row_name, 'Second_calc'] 
+                new_value = comparison_dataframe.loc[desired_row_name, 'Second_calc']
                 # We have calculated the new PS!
                 print(f"Recalculated PS (from PI): {new_value}")
-                df.loc[df['Word'] == 'DV-a', 'Value'] = round(new_value,2)
+                df.loc[df['Word'] == 'DV-a', 'Value'] = round(new_value, 2)
                 PS = df.loc[df['Word'] == 'DV-S', 'Value'].values[0]
                 a = df.loc[df['Word'] == 'DV-a', 'Value'].values[0]
                 # Find S/D
-                df.loc[df['Word'] == 'DV-S/a', 'Value'] =  round(PS / a,2)
+                df.loc[df['Word'] == 'DV-S/a', 'Value'] = round(PS / a, 2)
                 # Find PI
-                df.loc[df['Word'] == 'DV-PI', 'Value'] = round((PS - a) / ((PS + a)/2),2)
+                df.loc[df['Word'] == 'DV-PI', 'Value'] = round((PS - a) / ((PS + a) / 2), 2)
                 # Find TAmax
-                df.loc[df['Word'] == 'DV-TAmax', 'Value'] = round((PS + (2 * a)) / 3,2)
-
+                df.loc[df['Word'] == 'DV-TAmax', 'Value'] = round((PS + (2 * a)) / 3, 2)
 
         except ZeroDivisionError:
             print("Error: Division by zero encountered. Check the extracted values.")
     elif len(conditions_met) < 3:
         # At least 1 of the metrics is consistent, therefore PS and a can be assumed to be correct,
-        # Caclulate the inconsistent metrics from the PS and a calculations
+        # Calculate the inconsistent metrics from the PS and a calculations
         print("At least one text extraction error, correcting...")
 
         if 'Sovera' not in conditions_met:
             # Find S/a
-            df.loc[df['Word'] == 'DV-S/a', 'Value'] =  round(PS / a,2)
-            df.loc[df['Word'] == 'DV-a/S', 'Value'] =  round(a / PS,2)
+            df.loc[df['Word'] == 'DV-S/a', 'Value'] = round(PS / a, 2)
+            df.loc[df['Word'] == 'DV-a/S', 'Value'] = round(a / PS, 2)
         if 'PI' not in conditions_met:
             # Find PI
-            df.loc[df['Word'] == 'DV-PI', 'Value'] = round((PS - a) / ((PS + a)/2),2)
+            df.loc[df['Word'] == 'DV-PI', 'Value'] = round((PS - a) / ((PS + a) / 2), 2)
         if 'TAmax' not in conditions_met:
             # Find TAmax
-            df.loc[df['Word'] == 'DV-TAmax', 'Value'] = round((PS + (2 * a)) / 3,2)
+            df.loc[df['Word'] == 'DV-TAmax', 'Value'] = round((PS + (2 * a)) / 3, 2)
     else:
         print("All metrics are consistent.")
 
-
-
-
     return df
-

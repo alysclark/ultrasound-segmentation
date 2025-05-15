@@ -137,10 +137,10 @@ def segment(filenames=None, output_dir=None, pickle_path=None):
             # )  # Loads a pixel access object, where pixel values can be edited
 
             # from General_functions import Colour_extract, Text_from_greyscale
-            COL = General_functions.Colour_extract_vectorized(PIL_col, [255, 255, 100], 95, 95)
+            COL = General_functions.colour_extract_vectorized(PIL_col, [255, 255, 100], 95, 95)
             logger.info("Done Colour extract")
 
-            Fail, df = General_functions.Text_from_greyscale(cv2_img, COL)
+            Fail, df = General_functions.text_from_greyscale(cv2_img, COL)
         except Exception:  # flat fail on 1
             traceback.print_exc()  # prints the error message and traceback
             logger.error("Failed Text extraction")
@@ -158,7 +158,7 @@ def segment(filenames=None, output_dir=None, pickle_path=None):
             pass
 
         try:  # define end ROIs
-            Left_dimensions, Right_dimensions = General_functions.Define_end_ROIs(
+            Left_dimensions, Right_dimensions = General_functions.define_end_rois(
                 segmentation_mask, Xmin, Xmax, Ymin, Ymax
             )
         except Exception:
@@ -187,10 +187,10 @@ def segment(filenames=None, output_dir=None, pickle_path=None):
                 Right_dimensions,
                 ROI2,
                 ROI3,
-            ) = General_functions.Search_for_ticks(
+            ) = General_functions.search_for_ticks(
                 cv2_img, "Left", Left_dimensions, Right_dimensions
             )
-            ROIAX, Lnumber, Lpositions, ROIL = General_functions.Search_for_labels(
+            ROIAX, Lnumber, Lpositions, ROIL = General_functions.search_for_labels(
                 Cs,
                 ROIAX,
                 CenPoints,
@@ -218,10 +218,10 @@ def segment(filenames=None, output_dir=None, pickle_path=None):
                 Right_dimensions,
                 ROI2,
                 ROI3,
-            ) = General_functions.Search_for_ticks(
+            ) = General_functions.search_for_ticks(
                 cv2_img, "Right", Left_dimensions, Right_dimensions
             )
-            ROIAX, Rnumber, Rpositions, ROIR = General_functions.Search_for_labels(
+            ROIAX, Rnumber, Rpositions, ROIR = General_functions.search_for_labels(
                 Cs,
                 ROIAX,
                 CenPoints,
@@ -246,7 +246,7 @@ def segment(filenames=None, output_dir=None, pickle_path=None):
             try:  # Refine segmentation
                 (
                     refined_segmentation_mask, top_curve_mask, top_curve_coords
-                ) = General_functions.Segment_refinement(
+                ) = General_functions.segment_refinement(
                     cv2_img, Xmin, Xmax, Ymin, Ymax
                 )
             except Exception:
@@ -255,12 +255,12 @@ def segment(filenames=None, output_dir=None, pickle_path=None):
                 Fail = Fail + 1
                 pass
 
-            Xplot, Yplot, Ynought = General_functions.Plot_Digitized_data(
+            Xplot, Yplot, Ynought = General_functions.plot_digitized_data(
                 Rnumber, Rpositions, Lnumber, Lpositions, top_curve_coords,
             )
             
 
-            col = General_functions.Annotate(
+            col = General_functions.annotate(
                 input_image_obj=colRGBA,
                 refined_segmentation_mask=refined_segmentation_mask,
                 Left_dimensions=Left_dimensions,
@@ -279,7 +279,7 @@ def segment(filenames=None, output_dir=None, pickle_path=None):
             Annotated_scans.append(Annotated_path)
 
             try:
-                df = General_functions.Plot_correction(Xplot, Yplot, df)
+                df = General_functions.plot_correction(Xplot, Yplot, df)
                 Text_data.append(df)
             except Exception:
                 traceback.print_exc()
