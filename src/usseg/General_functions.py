@@ -29,12 +29,12 @@ from pytesseract import Output
 
 logger = logging.getLogger(__file__)
 
-import threading
-import tkinter as tk
 
-root = tk.Tk()  # Assuming you have a reference to the main tkinter window
+root = None  # Assuming you have a reference to the main tkinter window
 
 def execute_on_main_thread_and_wait(func, *args, **kwargs):
+    import threading
+    import tkinter as tk
     """Executes a function on the main thread and waits for it to complete.
 
     This function is useful for ensuring that Tkinter objects are manipulated safely from worker threads. Tkinter objects are not thread-safe and can only be manipulated from the main thread.
@@ -46,7 +46,10 @@ def execute_on_main_thread_and_wait(func, *args, **kwargs):
 
     Returns:
         The result of the function, or `None` if the function raised an exception."""
-    
+
+    global root
+    if root is None:
+        root = tk.Tk()
     if threading.current_thread() == threading.main_thread():
         return func(*args, **kwargs)
     else:
