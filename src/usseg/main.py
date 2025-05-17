@@ -81,6 +81,6 @@ def main(root_dir):
 
 
 if __name__ == "__main__":
-    root_dir = toml.load("config.toml")["root_dir"]
+    config_root_dir = toml.load("config.toml")["root_dir"]
     # root_dir = "Path/to/a/folder/of/images"
-    main(root_dir)
+    main(config_root_dir)
