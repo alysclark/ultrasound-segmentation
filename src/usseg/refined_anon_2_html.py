@@ -17,8 +17,6 @@ import traceback
 import toml
 
 # Import sementation module
-BASE_DIR = os.path.dirname(os.path.dirname(__file__))
-sys.path.append(BASE_DIR)
 from usseg import general_functions
 
 logger = logging.getLogger(__file__)

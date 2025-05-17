@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 
 # Python imports
-import os
-import sys
 import logging
 import math
 import time
@@ -13,8 +11,6 @@ import numpy as np
 import scipy
 
 # Local imports
-BASE_DIR = os.path.dirname(os.path.dirname(__file__))
-sys.path.append(BASE_DIR)
 import usseg
 
 logging.basicConfig(level=logging.DEBUG)

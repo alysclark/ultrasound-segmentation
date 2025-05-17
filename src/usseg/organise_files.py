@@ -1,25 +1,16 @@
 """Searches a directory and identifies images likely to be doppler ultrasounds"""
 # /usr/bin/env python3
 
-# Python imports
 import os
-import sys
-import re
 import pickle
-import traceback
-
-# Module imports
-import toml
-
-# Local imports
-BASE_DIR = os.path.dirname(os.path.dirname(__file__))
-sys.path.append(BASE_DIR)
-from usseg import general_functions
-from concurrent.futures import ThreadPoolExecutor
-import os
 import re
+import sys
+import toml
 import traceback
-# ... other imports ...
+
+from concurrent.futures import ThreadPoolExecutor
+
+from usseg import general_functions
 
 def check_file_for_us(file_path):
     """Checks a single file to see if it's a likely ultrasound and returns its path.

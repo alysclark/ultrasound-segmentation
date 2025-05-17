@@ -43,8 +43,6 @@ from pstats import SortKey
 import toml
 
 # Local imports
-BASE_DIR = os.path.dirname(os.path.dirname(__file__))
-sys.path.append(BASE_DIR)
 import usseg
 
 def prof(fn, *args, **kwargs):
