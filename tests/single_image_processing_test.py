@@ -1,18 +1,13 @@
 """Test the single image processing function."""
 
 # Python imports
-import os
-import sys
 import logging
-import pytest
 
 # Module imports
 import numpy as np
 from PIL import Image
 
 # Local imports
-BASE_DIR = os.path.dirname(os.path.dirname(__file__))
-sys.path.append(BASE_DIR)
 from usseg import data_from_image
 
 logging.basicConfig(level=logging.INFO)

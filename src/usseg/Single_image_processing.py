@@ -62,7 +62,7 @@ def data_from_image(PIL_img,cv2_img):
 
     # No error handling for initial segmentation as impossible to complete segmentation
     # without segmenation mask.
-    segmentation_mask, Xmin, Xmax, Ymin, Ymax = General_functions.Initial_segmentation(
+    segmentation_mask, Xmin, Xmax, Ymin, Ymax = General_functions.initial_segmentation(
         input_image_obj=PIL_image_RGB
     )
 

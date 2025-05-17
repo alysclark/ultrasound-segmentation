@@ -1,21 +1,13 @@
-#! /usr/bin/env python3
-
-# Python imports
 import base64
 import pickle
-from PIL import Image
-
-# Module imports
-import plotly.graph_objs as go
-import plotly.offline as pyo
-import pandas as pd
 import toml
 
-def generate_html(scans, Annotated_scans, Digitized_scans, tables):
+
+def generate_html(scans, annotated_scans, digitized_scans, tables):
     # Check if the number of scan paths and data tables match
     if len(scans) != len(tables):
         raise ValueError("The number of scan paths and data tables do not match.")
-    
+
     # Start building the HTML string
     html_str = '<html><head>'
     html_str += '<style>'
@@ -36,9 +28,9 @@ def generate_html(scans, Annotated_scans, Digitized_scans, tables):
     html_str += '</style>'
     html_str += '</head><body>'
 
-    html_str += '<div style="overflow-x: scroll;white-space: nowrap;">'    
+    html_str += '<div style="overflow-x: scroll;white-space: nowrap;">'
     # Loop over each scan and table and add them to the HTML
-    for scan_path, Annotated_scan, Digitized_scan, table_data in zip(scans, Annotated_scans, Digitized_scans, tables):
+    for scan_path, Annotated_scan, Digitized_scan, table_data in zip(scans, annotated_scans, digitized_scans, tables):
         # Add the scan image and processed image to the HTML
         with open(scan_path, 'rb') as f:
             im_b64 = base64.b64encode(f.read()).decode("utf-8")
@@ -57,7 +49,7 @@ def generate_html(scans, Annotated_scans, Digitized_scans, tables):
                 html_str += f'<div style="display:inline-block;max-width:100%";padding:10px><img src="data:image/png;base64,{im_b64}" width="300"></div>'
         else:
             html_str += '<div style="display:inline-block;width:300px"></div>'
-        
+
         # Add the table data to the HTML
         if table_data is not None:
             table_html = '<div style="display:inline-block;padding:10px;">'
@@ -68,7 +60,7 @@ def generate_html(scans, Annotated_scans, Digitized_scans, tables):
                     max_widths[i] = max(max_widths[i], len(str(val)))
                 table_html += '<tr>'
                 for i, val in enumerate(row):
-                    width = max_widths[i] + 10 # add some padding
+                    width = max_widths[i] + 10  # add some padding
                     try:
                         if i == table_data.columns.get_loc('Digitized Value'):
                             if val == '':
@@ -91,14 +83,15 @@ def generate_html(scans, Annotated_scans, Digitized_scans, tables):
 
         else:
             html_str += '<div style="display:inline-block;max-width:100%"></div>'
-            
+
         html_str += '<br>'
-    
+
     html_str += '</div>'
     # Finish building the HTML string
     html_str += '</body></html>'
-    
+
     return html_str
+
 
 def generate_html_from_pkl():
     """Generates a html file from the previously processed pickle files"""
@@ -106,11 +99,12 @@ def generate_html_from_pkl():
     # Loading lists from the saved file
     pickle_file = toml.load("config.toml")["pickle"]["segmented_data"]
     with open(pickle_file, 'rb') as f:
-        scan_paths,Digitized_scans, Annotated_scans,Text_data = pickle.load(f)
+        scan_paths, Digitized_scans, Annotated_scans, Text_data = pickle.load(f)
 
     html_str = generate_html(scan_paths, Annotated_scans, Digitized_scans, Text_data)
     with open('output4.html', 'w') as f:
         f.write(html_str)
+
 
 if __name__ == "__main__":
     generate_html_from_pkl()
