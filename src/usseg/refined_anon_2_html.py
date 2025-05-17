@@ -16,7 +16,7 @@ import cv2
 import traceback
 import toml
 
-# Import sementation module
+# Import segmentation module
 from usseg import general_functions
 
 logger = logging.getLogger(__file__)
@@ -25,7 +25,7 @@ logger = logging.getLogger(__file__)
 def setup_tesseract():
     """Checks tesseract is set up appropriately
 
-    Currently does nothing on a linux system and sets the
+    Currently, does nothing on a linux system and sets the
     pytesseract.pytesseract.tesseract_cmd to "C:/Program Files/Tesseract-OCR/tesseract.exe"
     for Windows and Cygwin systems.
 
@@ -111,34 +111,33 @@ def segment(filenames=None, output_dir=None, pickle_path=None):
             "Excepted either a string or a list"
         )
 
-
     if output_dir is None:
         output_dir = toml.load("config.toml")["output_dir"]
     os.makedirs(output_dir, exist_ok=True)
-    # xcel_file = output_dir + "sample3_processed_data"
+    # excel_file = output_dir + "sample3_processed_data"
     Text_data = []  # text data extracted from image
     Annotated_scans = []
     Digitized_scans = []
 
-    for input_image_filename in filenames:  # Iterare through all file names and populate excel file
+    for input_image_filename in filenames:  # Iterate through all file names and populate excel file
         # input_image_filename = "E:/us-data-anon/0000/IHE_PDI/00003511/AA3A43F2/AAD8766D/0000371E\\EEEAE224.JPG"
         image_name = os.path.basename(input_image_filename)
         print(input_image_filename)
 
         try:  # Try text extraction
             colRGBA = Image.open(input_image_filename)  # These images are in RGBA form
-            #colRGBA = General_functions.upscale_to_fixed_longest_edge(colRGBA)  # upscale to longest edge
+            # colRGBA = General_functions.upscale_to_fixed_longest_edge(colRGBA)  # upscale to longest edge
             PIL_col = colRGBA.convert("RGB")  # We need RGB, so convert here. with PIL
-            cv2_img = cv2.imread(input_image_filename) # with cv2.
+            cv2_img = cv2.imread(input_image_filename)  # with cv2.
             # pix = (
             #     col.load()
             # )  # Loads a pixel access object, where pixel values can be edited
 
             # from General_functions import Colour_extract, Text_from_greyscale
-            COL = General_functions.colour_extract_vectorized(PIL_col, [255, 255, 100], 95, 95)
+            COL = general_functions.colour_extract_vectorized(PIL_col, [255, 255, 100], 95, 95)
             logger.info("Done Colour extract")
 
-            Fail, df = General_functions.text_from_greyscale(cv2_img, COL)
+            Fail, df = general_functions.text_from_greyscale(cv2_img, COL)
         except Exception:  # flat fail on 1
             traceback.print_exc()  # prints the error message and traceback
             logger.error("Failed Text extraction")
@@ -147,7 +146,7 @@ def segment(filenames=None, output_dir=None, pickle_path=None):
             pass
 
         try:  # Try initial segmentation
-            segmentation_mask, Xmin, Xmax, Ymin, Ymax = General_functions.Initial_segmentation(
+            segmentation_mask, Xmin, Xmax, Ymin, Ymax = general_functions.initial_segmentation(
                 input_image_obj=PIL_col
             )
         except Exception:  # flat fail on 1
@@ -156,7 +155,7 @@ def segment(filenames=None, output_dir=None, pickle_path=None):
             pass
 
         try:  # define end ROIs
-            Left_dimensions, Right_dimensions = General_functions.define_end_rois(
+            Left_dimensions, Right_dimensions = general_functions.define_end_rois(
                 segmentation_mask, Xmin, Xmax, Ymin, Ymax
             )
         except Exception:
@@ -185,10 +184,10 @@ def segment(filenames=None, output_dir=None, pickle_path=None):
                 Right_dimensions,
                 ROI2,
                 ROI3,
-            ) = General_functions.search_for_ticks(
+            ) = general_functions.search_for_ticks(
                 cv2_img, "Left", Left_dimensions, Right_dimensions
             )
-            ROIAX, Lnumber, Lpositions, ROIL = General_functions.search_for_labels(
+            ROIAX, Lnumber, Lpositions, ROIL = general_functions.search_for_labels(
                 Cs,
                 ROIAX,
                 CenPoints,
@@ -216,10 +215,10 @@ def segment(filenames=None, output_dir=None, pickle_path=None):
                 Right_dimensions,
                 ROI2,
                 ROI3,
-            ) = General_functions.search_for_ticks(
+            ) = general_functions.search_for_ticks(
                 cv2_img, "Right", Left_dimensions, Right_dimensions
             )
-            ROIAX, Rnumber, Rpositions, ROIR = General_functions.search_for_labels(
+            ROIAX, Rnumber, Rpositions, ROIR = general_functions.search_for_labels(
                 Cs,
                 ROIAX,
                 CenPoints,
@@ -236,7 +235,7 @@ def segment(filenames=None, output_dir=None, pickle_path=None):
         except Exception:
             traceback.print_exc()  # prints the error message and traceback
             logger.error("Failed Axes search")
-            
+
             Fail = Fail + 1
             pass
 
@@ -244,7 +243,7 @@ def segment(filenames=None, output_dir=None, pickle_path=None):
             try:  # Refine segmentation
                 (
                     refined_segmentation_mask, top_curve_mask, top_curve_coords
-                ) = General_functions.segment_refinement(
+                ) = general_functions.segment_refinement(
                     cv2_img, Xmin, Xmax, Ymin, Ymax
                 )
             except Exception:
@@ -253,12 +252,11 @@ def segment(filenames=None, output_dir=None, pickle_path=None):
                 Fail = Fail + 1
                 pass
 
-            Xplot, Yplot, Ynought = General_functions.plot_digitized_data(
+            Xplot, Yplot, Ynought = general_functions.plot_digitized_data(
                 Rnumber, Rpositions, Lnumber, Lpositions, top_curve_coords,
             )
-            
 
-            col = General_functions.annotate(
+            col = general_functions.annotate(
                 input_image_obj=colRGBA,
                 refined_segmentation_mask=refined_segmentation_mask,
                 Left_dimensions=Left_dimensions,
@@ -277,7 +275,7 @@ def segment(filenames=None, output_dir=None, pickle_path=None):
             Annotated_scans.append(Annotated_path)
 
             try:
-                df = General_functions.plot_correction(Xplot, Yplot, df)
+                df = general_functions.plot_correction(Xplot, Yplot, df)
                 Text_data.append(df)
             except Exception:
                 traceback.print_exc()
@@ -334,7 +332,8 @@ def segment(filenames=None, output_dir=None, pickle_path=None):
         with open(pickle_path, "wb") as f:
             pickle.dump([filenames, Digitized_scans, Annotated_scans, Text_data], f)
     i = 0
-    return (filenames, Digitized_scans, Annotated_scans, Text_data)
+    return filenames, Digitized_scans, Annotated_scans, Text_data
+
 
 if __name__ == "__main__":
     setup_tesseract()

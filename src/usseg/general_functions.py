@@ -4,7 +4,6 @@ import traceback
 import math
 import re
 import logging
-from functools import lru_cache
 
 # Module imports
 import matplotlib.pyplot as plt
@@ -184,10 +183,10 @@ def define_end_rois(segmentation_mask, Xmin, Xmax, Ymin, Ymax):
 
     Args:
         segmentation_mask (ndarray) : A binary array mask showing the corse segmentation of waveform (1) against background (0).
-        Xmin (float) : Minimum X coordinate of the corse segmentation.
-        Xmax (float) : Maximum X coordinate of the corse segmentation.
-        Ymin (float) : Minimum Y coordinate of the corse segmentation.
-        Ymax (float) : Maximum Y coordinate of the corse segmentation.
+        Xmin (float) : Minimum X coordinate of the coarse segmentation.
+        Xmax (float) : Maximum X coordinate of the coarse segmentation.
+        Ymin (float) : Minimum Y coordinate of the coarse segmentation.
+        Ymax (float) : Maximum Y coordinate of the coarse segmentation.
 
     Returns:
         (tuple): tuple containing:
@@ -650,7 +649,7 @@ def search_for_labels(
             - **positions** (list): A list of positions of the label values.
             - **empty_to_fill** (ndarray): A array showing bounding boxes on image.
     """
-
+    extracted_text_data = None
     for thresh_value in np.arange(100, 190, 5):  # Threshold to optimise the resulting text extraction.
         image = input_image_obj
         input_image_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -933,7 +932,7 @@ def plot_digitized_data(Rticks, Rlocs, Lticks, Llocs, top_curve_coords):
         also inverts the waveform if the average flow rate is negative.
     """
 
-    #We will have problems if the right axes only has 1 tick and that tick is equal to the minimum on the left axis
+    # We will have problems if the right axes only has 1 tick and that tick is equal to the minimum on the left axis
     if len(Rticks) == 1:
         Rticks.append(Lticks[-1])
         Rlocs.append([Rlocs[-1][0], Llocs[-1][1]])
@@ -977,7 +976,7 @@ def plot_digitized_data(Rticks, Rlocs, Lticks, Llocs, top_curve_coords):
     Y = [YminL, YmaxR]
 
     for i in range(0, len(b)):
-        if b[i][1] >= XminL + 20 and b[i][1] <= XmaxR - 20:
+        if XminL + 20 <= b[i][1] <= XmaxR - 20:
             X.append(b[i][1])
             Y.append(b[i][0])
 
@@ -1043,7 +1042,7 @@ def plot_correction(Xplot, Yplot, df):
         df.insert(loc=3, column="Digitized Value", value="")
         peaks, _ = find_peaks(y)  # PSV
         troughs, _ = find_peaks(-y)  # EDV
-        # filter out any anomylous signals:
+        # filter out any anomalous signals:
         trough_widths, _, _, _ = peak_widths(-y, troughs)
         mean_widths_troughs = statistics.mean(trough_widths)
         # filter out anomalous peaks
@@ -1053,7 +1052,8 @@ def plot_correction(Xplot, Yplot, df):
                 valid_troughs.append(troughs[i])
         troughs = valid_troughs
 
-        widths_of_peaks, _, _, _ = peak_widths(y, peaks)
+        results_half = peak_widths(y, peaks)
+        widths_of_peaks = results_half[0]
         mean_widths_peaks = statistics.mean(widths_of_peaks)
         valid_peaks = []
         for i in range(len(peaks)):
@@ -1378,7 +1378,7 @@ def append_spherical_1point(xyz):
     return ptsnew
 
 
-def colour_extract_vectorized(input_image_obj, TargetRGB, cyl_length, cyl_radius):
+def colour_extract_vectorized(input_image_obj, target_rgb, cyl_length, cyl_radius):
     """
     Extracts a specified color from an image using a cylindrical filter in RGB space.
 
@@ -1388,7 +1388,7 @@ def colour_extract_vectorized(input_image_obj, TargetRGB, cyl_length, cyl_radius
 
     Args:
         input_image_obj (np.ndarray): A 3D numpy array representing the RGB image.
-        TargetRGB (list): A list of three integers representing the target RGB color.
+        target_rgb (list): A list of three integers representing the target RGB color.
         cyl_length (int): The length of the cylindrical filter along the axis of the color
                           in RGB space.
         cyl_radius (int): The radius of the cylindrical filter in RGB space.
@@ -1398,7 +1398,7 @@ def colour_extract_vectorized(input_image_obj, TargetRGB, cyl_length, cyl_radius
                          and the rest of the image is set to black.
     """
     # Convert the target RGB color to spherical coordinates
-    targ = np.array(TargetRGB)
+    targ = np.array(target_rgb)
     out2 = append_spherical_1point(targ)
 
     # Calculate the coordinates of the cylinder in RGB space
@@ -1426,14 +1426,14 @@ def colour_extract_vectorized(input_image_obj, TargetRGB, cyl_length, cyl_radius
     # Calculate the vector defining the cylinder axis
     vec = end - start
     # Calculate the cylinder's constraint based on its radius
-    const = r * np.linalg.norm(vec)
+    constraint = r * np.linalg.norm(vec)
     # Calculate the cross products for each pixel in the image
     cross_products = np.cross(img_array - start, vec)
     # Calculate the dot products for the start and end points of the cylinder
     dot_products_start = np.tensordot(img_array - start, vec, axes=([2], [0]))
     dot_products_end = np.tensordot(img_array - end, vec, axes=([2], [0]))
     # Generate a boolean mask indicating if a pixel lies within the cylinder
-    mask = (dot_products_start >= 0) & (dot_products_end <= 0) & (np.linalg.norm(cross_products, axis=2) <= const)
+    mask = (dot_products_start >= 0) & (dot_products_end <= 0) & (np.linalg.norm(cross_products, axis=2) <= constraint)
 
     # Create the output image based on the mask, setting target color regions to white and all else to black
     output_array = np.where(mask[..., None], [255, 255, 255], [0, 0, 0])
@@ -1458,7 +1458,7 @@ def text_from_greyscale(input_image_obj, COL):
     boxes around the text.
 
     Args:
-        input_image_filename (str) : Name of file within current directory, or path to a file.
+        input_image_obj (str) : Name of file within current directory, or path to a file.
         COL (JpegImageFile) : PIL JpegImageFile of the filtered image highlighting yellow text.
     Returns:
         (tuple): tuple containing:
@@ -1475,7 +1475,7 @@ def text_from_greyscale(input_image_obj, COL):
     from scipy.ndimage import binary_dilation
 
     # 2. Apply slight Gaussian blur
-    #smoothed_image = COL.filter(ImageFilter.GaussianBlur(radius=1)) # In some cases smoothing helps, in others it makes it worse?
+    # smoothed_image = COL.filter(ImageFilter.GaussianBlur(radius=1)) # In some cases smoothing helps, in others it makes it worse?
 
     for y in range(
             int(COL.size[1] * 0.45), COL.size[1]
@@ -1483,7 +1483,7 @@ def text_from_greyscale(input_image_obj, COL):
         for x in range(COL.size[0]):
             PIX[x, y] = (0, 0, 0)
 
-    pixels = COL  #np.array(smoothed_image)
+    pixels = COL  # np.array(smoothed_image)
     data = pytesseract.image_to_data(
         pixels, output_type=Output.DICT, lang="eng", config="--oem 1 --psm 3 -c tessedit_char_blacklist=l,!_|=$"
     )
@@ -1689,7 +1689,7 @@ def text_from_greyscale(input_image_obj, COL):
     ]
 
     # Split text into lines
-    lines = grouped_words  #text.split("\n")
+    lines = grouped_words  # text.split("\n")
     # Initialize DataFrame
     df = pd.DataFrame(columns=["Line", "Word", "Value", "Unit"])
 
@@ -1999,54 +1999,38 @@ def metric_check(df):
 
         return PRF, target_words  # Return None if no known prefix is found
 
-    def add_missing_rows(df):
+    def add_missing_rows(df_in):
         # Identify the Prefix
-        prefix, target_words = identify_prefix(df)
+        prefix, target_words = identify_prefix(df_in)
 
         # Determine Missing Rows
-        existing_words = df['Word'].tolist()
+        existing_words = df_in['Word'].tolist()
         missing_targets = [word for word in target_words if word not in existing_words]
 
         # Add Missing Rows
         for target in missing_targets:
             new_row = {"Word": target, "Value": 0, "Unit": ""}
-            df = df._append(new_row, ignore_index=True)
+            df_in = df_in._append(new_row, ignore_index=True)
 
-        return df
+        return df_in
 
     df = add_missing_rows(df)
 
-    def check_PI_value(value):  # Decimal can be misread, so common sense check.
-        # If the value is between 0 and 2, return it as is
-        if 0 <= value <= 3:
-            return value
+    def check_TAmax_value(value_in, df_in):  # Decimal can be misread, so common sense check.
 
-        # If the value is between 3 and 10, divide it by 10
-        if 3 <= value <= 10:
-            return value / 10
-
-        # If the value is between 10 and 200, divide it by 100
-        if 10 <= value <= 200:
-            return value / 100
-
-        # If the value is outside of these ranges, return a default or handle accordingly
-        return value  # or return some default value or raise an exception
-
-    def check_TAmax_value(value, df):  # Decimal can be misread, so common sense check.
-
-        MD = df.loc[df['Word'].str.contains('MD'), 'Value'].values[0] if df['Word'].str.contains('MD').any() else 0
-        PS = df.loc[df['Word'].str.contains('PS'), 'Value'].values[0] if df['Word'].str.contains('PS').any() else 0
-        ED = df.loc[df['Word'].str.contains('ED'), 'Value'].values[0] if df['Word'].str.contains('ED').any() else 0
+        MD = df_in.loc[df['Word'].str.contains('MD'), 'Value'].values[0] if df_in['Word'].str.contains('MD').any() else 0
+        PS = df_in.loc[df['Word'].str.contains('PS'), 'Value'].values[0] if df_in['Word'].str.contains('PS').any() else 0
+        ED = df_in.loc[df['Word'].str.contains('ED'), 'Value'].values[0] if df_in['Word'].str.contains('ED').any() else 0
 
         # If the other values are positive, return the absolute value of TAmax
-        if value < 0 and MD > 0 and PS > 0 and ED > 0:
-            return abs(value)
+        if value_in < 0 < MD and PS > 0 and ED > 0:
+            return abs(value_in)
 
-        return value  # or return some default value or raise an exception
+        return value_in  # or return some default value or raise an exception
 
     # Sense check some values:
     PI = df.loc[df['Word'].str.contains('PI'), 'Value'].values[0] if df['Word'].str.contains('PI').any() else 0
-    df.loc[df['Word'].str.contains('PI'), 'Value'] = check_PI_value(PI)
+    df.loc[df['Word'].str.contains('PI'), 'Value'] = check_pi_value(PI)
     TAmax = df.loc[df['Word'].str.contains('TAmax'), 'Value'].values[0] if df['Word'].str.contains('TAmax').any() else 0
     df.loc[df['Word'].str.contains('TAmax'), 'Value'] = check_TAmax_value(TAmax, df)
 
@@ -2061,7 +2045,7 @@ def metric_check(df):
         MD = df.loc[df['Word'].str.contains('MD'), 'Value'].values[0] if df['Word'].str.contains('MD').any() else 0
 
         # Check if there's a difference in sign between PS and ED
-        if (PS > 0 and ED < 0) or (PS < 0 and ED > 0):
+        if (PS > 0 > ED) or (PS < 0 < ED):
             # Check if TAmax and MD have the same sign
             if (TAmax > 0 and MD > 0) or (TAmax < 0 and MD < 0):
                 # If so, change the sign of PS and ED to match that of TAmax and MD
@@ -2270,22 +2254,22 @@ def metric_check(df):
 def upscale_both_images(PIL_img, cv2_img, max_length=950, min_length=950):
     """ **For testing improved text extraction**
 
-    Upscales both a PIL and an OpenCV image to a specified maximum length while 
+    Up-scales both a PIL and an OpenCV image to a specified maximum length while
     maintaining their aspect ratios. If the longest edge of an image is already 
-    greater than or equal to the specified minimum length, the image will not be upscaled.
+    greater than or equal to the specified minimum length, the image will not be up-scaled.
 
     Args:
         PIL_img (PIL.Image.Image): The image to upscale using the PIL library.
         cv2_img (numpy.ndarray): The image to upscale using the OpenCV library.
-        max_length (int, optional): The maximum length of the longest edge after upscaling. 
+        max_length (int, optional): The maximum length of the longest edge after up-scaling.
                                     Defaults to 950.
-        min_length (int, optional): The minimum length required to trigger upscaling. 
+        min_length (int, optional): The minimum length required to trigger up-scaling.
                                     If the longest edge of the image is already greater 
-                                    than or equal to this length, upscaling does not occur. 
+                                    than or equal to this length, up-scaling does not occur.
                                     Defaults to 950.
 
     Returns:
-        tuple: A tuple containing the upscaled PIL.Image.Image and upscaled numpy.ndarray (OpenCV image) respectively.
+        tuple: A tuple containing the up-scaled PIL.Image.Image and up-scaled numpy.ndarray (OpenCV image) respectively.
     """
 
     def upscale_image(image, is_pil):
@@ -2319,14 +2303,31 @@ def upscale_both_images(PIL_img, cv2_img, max_length=950, min_length=950):
     return upscaled_PIL_img, upscaled_cv2_img
 
 
+def check_pi_value(value):  # Decimal can be misread, so common sense check.
+    # If the value is between 0 and 2, return it as is
+    if 0 <= value <= 3:
+        return value
+
+    # If the value is between 3 and 10, divide it by 10
+    if 3 <= value <= 10:
+        return value / 10
+
+    # If the value is between 10 and 200, divide it by 100
+    if 10 <= value <= 200:
+        return value / 100
+
+    # If the value is outside of these ranges, return a default or handle accordingly
+    return value  # or return some default value or raise an exception
+
+
 def metric_check_dv(df):
     """
     Performs validation and correction of ultrasound measurement metrics within a DataFrame
     for Ductus Venosus (DV).
 
     This function performs the same function as Metric_check, but for Ductus Venosus. Metric_check
-    works for left, right and ubilical arteries as their scans all contain the same patient measurements,
-    but DV scans have a seperate set of measurements with their own unique relationship - this function
+    works for left, right, and umbilical arteries as their scans all contain the same patient measurements,
+    but DV scans have a separate set of measurements with their own unique relationship - this function
     corrects the values for DV scans.
 
     Args:
@@ -2364,22 +2365,6 @@ def metric_check_dv(df):
 
     df = add_missing_rows(df)
 
-    def check_PI_value(value):  # Decimal can be misread, so common sense check.
-        # If the value is between 0 and 2, return it as is
-        if 0 <= value <= 3:
-            return value
-
-        # If the value is between 3 and 10, divide it by 10
-        if 3 <= value <= 10:
-            return value / 10
-
-        # If the value is between 10 and 200, divide it by 100
-        if 10 <= value <= 200:
-            return value / 100
-
-        # If the value is outside of these ranges, return a default or handle accordingly
-        return value  # or return some default value or raise an exception
-
     def check_TAmax_value(value, df):  # Decimal can be misread, so common sense check.
 
         PLI = df.loc[df['Word'] == 'DV-S/a', 'Value'].values[0]
@@ -2387,14 +2372,14 @@ def metric_check_dv(df):
         ED = df.loc[df['Word'] == 'DV-D', 'Value'].values[0]
 
         # If the other values are positive, return the absolute value of TAmax
-        if value < 0 and PLI > 0 and PS > 0 and ED > 0:
+        if value < 0 < PLI and PS > 0 and ED > 0:
             return abs(value)
 
         return value  # or return some default value or raise an exception
 
     # Sense check some values:
     PI = df.loc[df['Word'] == 'DV-PI', 'Value'].values[0]
-    df.loc[df['Word'] == 'DV-PI', 'Value'] = check_PI_value(PI)
+    df.loc[df['Word'] == 'DV-PI', 'Value'] = check_pi_value(PI)
     TAmax = df.loc[df['Word'] == 'DV-TAmax', 'Value'].values[0]
     df.loc[df['Word'] == 'DV-TAmax', 'Value'] = check_TAmax_value(TAmax, df)
 

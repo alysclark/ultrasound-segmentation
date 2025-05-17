@@ -32,8 +32,6 @@ The script is currently under development and may contain bugs.
 #/usr/bin/env python3
 
 # Python imports
-import os
-import sys
 import cProfile
 import pstats
 import io
@@ -45,6 +43,7 @@ import toml
 # Local imports
 import usseg
 
+
 def prof(fn, *args, **kwargs):
 
     pr = cProfile.Profile()
@@ -54,8 +53,8 @@ def prof(fn, *args, **kwargs):
     pr.disable()
 
     s = io.StringIO()
-    sortby = SortKey.CUMULATIVE
-    ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+    sort_by = SortKey.CUMULATIVE
+    ps = pstats.Stats(pr, stream=s).sort_stats(sort_by)
     ps.print_stats()
 
     with open(f"{fn.__name__}.log", "w+") as f:
@@ -74,13 +73,14 @@ def main(root_dir):
     filenames = prof(usseg.get_likely_us, root_dir)
 
     # Segments and digitises the pre-selected ultrasound images.
-    #filenames = "Path/to/a/single/test/file.JPG"
+    # filenames = "Path/to/a/single/test/file.JPG"
     prof(usseg.segment, filenames)
 
     # Generates an output.html of the segmented output
     prof(usseg.generate_html_from_pkl)
 
+
 if __name__ == "__main__":
     root_dir = toml.load("config.toml")["root_dir"]
-    #root_dir = "Path/to/a/folder/of/images"
+    # root_dir = "Path/to/a/folder/of/images"
     main(root_dir)

@@ -4,13 +4,13 @@
 import os
 import pickle
 import re
-import sys
 import toml
 import traceback
 
 from concurrent.futures import ThreadPoolExecutor
 
 from usseg import general_functions
+
 
 def check_file_for_us(file_path):
     """Checks a single file to see if it's a likely ultrasound and returns its path.
@@ -23,16 +23,17 @@ def check_file_for_us(file_path):
     """
     if file_path.endswith('.JPG'):
         try:
-            Fail, df = General_functions.scan_type_test(file_path)
+            Fail, df = general_functions.scan_type_test(file_path)
             if Fail == 0:
                 # Extract patient ID from the file path
                 match = re.search(r"\d{4}", file_path)
                 if match:
                     patient_id = match.group(0)
-                    return (patient_id, file_path)
+                    return patient_id, file_path
         except Exception:
             traceback.print_exc()
     return None
+
 
 def get_likely_us(root_dir, pickle_path=None, use_parallel=True):
     """Searches a directory and identifies the images that are likely to be doppler ultrasounds.
@@ -92,8 +93,7 @@ def get_likely_us(root_dir, pickle_path=None, use_parallel=True):
 
     return all_paths
 
-    
-if __name__ == "__main__":
 
-    root_dir = toml.load("config.toml")["root_dir"]
-    get_likely_us(root_dir)
+if __name__ == "__main__":
+    config_root_dir = toml.load("config.toml")["root_dir"]
+    get_likely_us(config_root_dir)

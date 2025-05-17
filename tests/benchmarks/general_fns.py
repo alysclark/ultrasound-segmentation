@@ -10,36 +10,33 @@ from PIL import Image
 import numpy as np
 import scipy
 
-# Local imports
-import usseg
-
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__file__)
 
-def test_colour_extraction():
 
-    def Colour_extract(input_image_obj, TargetRGB, cyl_length, cyl_radius):
-        """OLD FUNCTION: Function for extracing target colours from image
+def test_colour_extraction():
+    def colour_extract(input_image_obj, target_rgb, cyl_length, cyl_radius):
+        """OLD FUNCTION: Function for extracting target colours from image
         converts image to RGB space and find coordinates of pixels within a
         cylinder whose center is the target triplet. You can visualise this
         by removing commented plot statements throughout this function.
 
         Args:
-            input_image_filename (str) : Name of file within current directory, or path to a file.
-            TargetRGB (list) : triplet of target Red Green Blue colour [Red,Green,Blue].
+            input_image_obj (str) : Name of file within current directory, or path to a file.
+            target_rgb (list) : triplet of target Red Green Blue colour [Red,Green,Blue].
             cyl_length (int) : length of cylinder.
             cyl_radius (int) : radius of cylinder.
 
         Returns:
             COL (JpegImageFile) : PIL JpegImageFile of the filtered image highlighting yellow text.
         """
-        col4 = input_image_obj
-        pix4 = col4.load()
+        # col4 = input_image_obj
+        # pix4 = col4.load()
 
         # DEFINE END POINTS OF CYLINDER
         np.set_printoptions(suppress=True)
 
-        def appendSpherical_1point(xyz):
+        def append_spherical_1point(xyz):
             ptsnew = np.hstack(
                 (xyz, np.zeros(xyz.shape), np.zeros(xyz.shape), np.zeros(xyz.shape))
             )
@@ -53,8 +50,8 @@ def test_colour_extraction():
 
             return ptsnew
 
-        targ = np.array(TargetRGB)
-        out2 = appendSpherical_1point(targ)
+        targ = np.array(target_rgb)
+        out2 = append_spherical_1point(targ)
 
         H2 = cyl_length  # This is our Hypotenuse
         O2 = math.sin(math.radians(out2[6])) * H2  # Opposite length 2
@@ -95,15 +92,15 @@ def test_colour_extraction():
         # ax.zaxis.label.set_color('blue')
         # ax.tick_params(axis='z', colors='blue')
         # ax.view_init(20, -45)
-        #plt.show()
+        # plt.show()
 
-        ## CYLINDER STUFF
+        # CYLINDER STUFF
         # defining mask
-        shape = (260, 260, 260)
-        image = np.zeros(shape=shape)
+        # shape = (260, 260, 260)
+        # image = np.zeros(shape=shape)
 
         # set radius and centres values
-        r = 100
+        # r = 100
         start = [R1, G1, B1]
         end = [R2, G2, B2]
         p1 = np.array(start)
@@ -164,9 +161,8 @@ def test_colour_extraction():
             const = r * np.linalg.norm(vec)
 
             if (
-                np.dot(q - pt1, vec) >= 0
-                and np.dot(q - pt2, vec) <= 0
-                and np.linalg.norm(np.cross(q - pt1, vec)) <= const
+                    np.dot(q - pt1, vec) >= 0 >= np.dot(q - pt2, vec)
+                    and np.linalg.norm(np.cross(q - pt1, vec)) <= const
             ):
                 # print("is inside")
                 logi = 1
@@ -178,7 +174,7 @@ def test_colour_extraction():
 
         col4 = input_image_obj
         pix4 = col4.load()
-        gry4 = col4.convert("L")  # returns grayscale version.
+        # gry4 = col4.convert("L")  # returns grayscale version.
 
         Rmat = []
         Gmat = []
@@ -213,11 +209,11 @@ def test_colour_extraction():
         Bmat = np.array(Bmat)
         Xs = np.array(Xs)
         Ys = np.array(Ys)
-        #ax.scatter(Rmat[ids],Gmat[ids],Bmat[ids],c = C[ids]/255) # plot the select points in RGB coords
-        #ax.scatter(Rmat,Gmat,Bmat,c = C/255)
-        #plt.show()
+        # ax.scatter(Rmat[ids],Gmat[ids],Bmat[ids],c = C[ids]/255) # plot the select points in RGB coords
+        # ax.scatter(Rmat,Gmat,Bmat,c = C/255)
+        # plt.show()
 
-        ## COMBINE
+        # COMBINE
         COL = input_image_obj
         COL = COL.convert("RGB")  # We need RGB, so convert here.
         PIX = COL.load()
@@ -240,15 +236,17 @@ def test_colour_extraction():
     rad = 100
     height = 80
     num_iter = 3
+    img_extracted_orig = None
+    img_extracted_new = None
 
     t_init = time.time()
     for _ in range(num_iter):
-        img_extracted_new = usseg.General_functions.colour_extract(image, target_colour, rad, height)
+        img_extracted_new = colour_extract(image, target_colour, rad, height)
     t_fin_new = (time.time() - t_init) / num_iter
 
     t_init = time.time()
     for _ in range(num_iter):
-        img_extracted_orig = Colour_extract(image, target_colour, rad, height)
+        img_extracted_orig = colour_extract(image, target_colour, rad, height)
     t_fin_old = (time.time() - t_init) / num_iter
 
     logging.info(f"Average run time of test method: {t_fin_old:.3f}")
