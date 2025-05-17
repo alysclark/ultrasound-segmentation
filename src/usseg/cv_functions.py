@@ -129,6 +129,7 @@ def get_labelled_vessel_type(vessel_text, no_text_extracted="N/A"):
     Args:
         vessel_text (str) : The vessel text extracted from the image.
             Expected inputs are "L", "U" and "R".
+        no_text_extracted (str) : No text extracted string, default "N/A".
 
     Returns:
         vessel_type (int) : Either 0, 1 or 2 for umbilical, left and right uterine respectively.
@@ -311,7 +312,7 @@ def get_us_metadata(
 
     Args:
         image (ndarry) : A numpy array to be passed to tesseract.
-        config_dict (dict) : A dictionary containing the paths to the
+        config_file_dict (dict) : A dictionary containing the paths to the
             configuration files. Defaults to None. If None, fills dictionary
             with default structure. Structure:
             template_toml_file (str, optional) : The TOML file containing the
@@ -401,7 +402,7 @@ def segment_doppler(cv2_img):
         cv2_img (ndarray) : Numpy array of the image.
 
     Returns:
-        singal (tuple) : A tuple containing a numpy array for the time axis and
+        signal (tuple) : A tuple containing a numpy array for the time axis and
                 signal respectively.
     """
 
