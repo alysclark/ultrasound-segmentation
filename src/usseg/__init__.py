@@ -1,6 +1,6 @@
 """Initialises the ultrasound-segmentation module"""
 from importlib.metadata import version, PackageNotFoundError
-from usseg import General_functions
+from usseg import general_functions
 from usseg.Organise_files import get_likely_us
 from usseg.Single_image_processing import data_from_image
 from usseg.Refined_anon_2_html import setup_tesseract, segment
