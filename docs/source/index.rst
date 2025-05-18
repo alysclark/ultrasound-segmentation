@@ -10,7 +10,7 @@ Welcome to Ultrasound Segmentation's documentation!
    :maxdepth: 2
    :caption: Contents:
 
-   Installation
+   installation
    information
    usseg
    
