@@ -2,10 +2,6 @@
 #
 # For the full list of built-in configuration values, see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
-import os
-import sys
-sys.path.insert(0, os.path.abspath('./usseg'))
-
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
@@ -35,11 +31,8 @@ autodoc_default_options = {
     'show-inheritance': True,
 }
 
-
-
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 html_theme = 'renku'
-html_static_path = ['_static']
-
+# html_static_path = ['_static']

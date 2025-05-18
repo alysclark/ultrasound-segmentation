@@ -14,6 +14,10 @@ Welcome to Ultrasound Segmentation's documentation!
    information
    usseg
    
+.. toctree::
+  :hidden:
+
+  modules
 
 Indices and tables
 ==================

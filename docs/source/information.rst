@@ -18,6 +18,7 @@ Table of Contents
 ~~~~~~~~~~~~~~~~~~~~~~~
 
 .. _introduction:
+
 Introduction to Ultrasound Segmentation Package (usseg)
 =======================================================
 
@@ -26,7 +27,7 @@ a specialized toolkit for extracting and processing data from Doppler
 ultrasound images. Developed with a focus on compatibility with
 the Voluson E8 ultrasound system.
 
-.. figure:: Overview1.png
+.. figure:: images/Overview1.png
    :align: center
 
 The package is composed of a series of interconnected functions, each 
@@ -49,6 +50,7 @@ of a collaborative effort to advance ultrasound imaging technology, and we
 welcome contributions and suggestions from the community.
 
 .. _overview:
+
 Overview
 ========
 
@@ -62,22 +64,25 @@ Text Extraction Process
 
 1. **colour_extract_vectorized**: Filters the image to highlight a specific target 
    colour of pixel, preparing it for text extraction.
-.. figure:: Vectorized_colour_extraction_diagram.png
-   :width: 45%
-   :align: center
+
+   .. figure:: images/Vectorized_colour_extraction_diagram.png
+      :width: 45%
+      :align: center
 
 2. **Text_from_greyscale**: Processes the filtered image to extract text, matching 
    lines to specific target words.
-.. figure:: Text_extraction_diagram.png
-   :alt: Text identified and bounded by blue boxes
-   :align: center
+
+   .. figure:: images/Text_extraction_diagram.png
+      :alt: Text identified and bounded by blue boxes
+      :align: center
 
 3. **Metric_check**: Performs a common-sense check on the extracted measurements 
    using knowledge of their interdependencies and known physiological limits, 
    ensuring data accuracy.
-.. figure:: df_data_extracted_diagram.png
-   :width: 45%
-   :align: center
+
+   .. figure:: images/df_data_extracted_diagram.png
+      :width: 45%
+      :align: center
 
 Following the successful extraction and validation of text data, the workflow 
 transitions to the image segmentation process.
@@ -89,11 +94,11 @@ Image Segmentation Process
    
 5. **Define_end_ROIs**: Defines regions adjacent to the coarse segmentation.
 
-.. figure:: Initial_segmentation_diagram.png
+.. figure:: images/Initial_segmentation_diagram.png
 
 6. **Segment_refinement**: Refines the segmentation within the coarse boundaries.
 
-.. figure:: Segment_refinement_diagram.png
+.. figure:: images/Segment_refinement_diagram.png
 
 7. **Search_for_ticks**: Identifies ticks in the axes ROIs for accurate scaling.
 
@@ -103,7 +108,7 @@ Image Segmentation Process
 
 9. **Plot_Digitized_data**: Digitizes the extracted data to plot the waveform.
 
-.. figure:: Digitize_Function_diagram.png
+.. figure::images/Digitize_Function_diagram.png
    :align: center
 
 
@@ -112,7 +117,7 @@ Image Segmentation Process
 
 11. **Annotate**: Visualizes the segmentation steps on the original image.
 
-.. figure:: Overview2.png
+.. figure:: images/Overview2.png
    :align: center
 
 Each function in these sequences plays a vital role in the overall process, which aims for 
@@ -120,6 +125,7 @@ accurate data extraction. For more in-depth information about each function, ple
 to the detailed descriptions in the :doc:`here <usseg>` section of this documentation.
 
 .. _usage:
+
 Usage Examples
 ==============
 
@@ -159,6 +165,7 @@ A visualisation file output.html is generated for evaluation the data extraction
    python usseg/main.py
 
 .. _limitations:
+
 Limitations and future work
 ===========================
 
@@ -187,9 +194,7 @@ to adjust these during digitization, exceptions can still occur.
 
 
 
-.. |Search for Labels| image:: TickandLabel_diagram.png
+.. |Search for Labels| image:: images/TickandLabel_diagram.png
    :width: 45%
-.. |Search for Ticks| image:: ROIAX_change_diagram.png
+.. |Search for Ticks| image:: images/ROIAX_change_diagram.png
    :width: 41%
-
-
