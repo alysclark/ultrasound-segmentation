@@ -1,4 +1,21 @@
-"""Initialises the ultrasound-segmentation module"""
+"""Initialises the ultrasound-segmentation module.
+
+Makes available the following module:
+
+* general_functions
+
+and the following functions:
+
+* get_likely_us
+* data_from_image
+* segment
+* setup_tesseract
+* generate_html_from_pkl
+* generate_html
+* main
+
+Also, sets the attribute '__version__'.
+"""
 from importlib.metadata import version, PackageNotFoundError
 from usseg import general_functions
 from usseg.organise_files import get_likely_us

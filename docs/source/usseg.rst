@@ -1,8 +1,5 @@
-usseg package
-=============
-
 Submodules
-----------
+==========
 
 usseg.general\_functions module
 -------------------------------

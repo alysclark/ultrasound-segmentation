@@ -38,6 +38,8 @@ classifiers = [
 version_scheme = "no-guess-dev"
 local_scheme = "dirty-tag"
 
+[project.optional-dependencies]
+docs = ["renku-sphinx-theme"]
 #[tool.poetry.dependencies]
 #python = ">=3.10,<3.12"
 #matplotlib = "^3.7.1"

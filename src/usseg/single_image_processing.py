@@ -7,15 +7,17 @@ extracting segmentation and textual data from the images.
 
 To segment a single ultrasound image, you can use the following code:
 
-```python
-from usseg.Single_image_processing import data_from_image
+.. code-block:: python
 
-# Load the ultrasound image.
-PIL_img = ...
-cv2_img = ...
+   from usseg.single_image_processing import data_from_image
 
-# Extract segmentation and textual data from the image.
-df, XYdata = data_from_image(PIL_img, cv2_img)```
+   # Load the ultrasound image.
+   PIL_img = ...
+   cv2_img = ...
+
+   # Extract segmentation and textual data from the image.
+   df, XYdata = data_from_image(PIL_img, cv2_img)
+
 """
 # Python imports
 import logging
