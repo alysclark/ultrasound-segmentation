@@ -4,42 +4,42 @@ usseg package
 Submodules
 ----------
 
-usseg.General\_functions module
+usseg.general\_functions module
 -------------------------------
 
-.. automodule:: usseg.General_functions
+.. automodule:: usseg.general_functions
    :members:
    :undoc-members:
    :show-inheritance:
 
-usseg.Organise\_files module
+usseg.organise\_files module
 ----------------------------
 
-.. automodule:: usseg.Organise_files
+.. automodule:: usseg.organise_files
    :members:
    :undoc-members:
    :show-inheritance:
 
-usseg.Refined\_anon\_2\_html module
+usseg.segment\_files module
 -----------------------------------
 
-.. automodule:: usseg.Refined_anon_2_html
+.. automodule:: usseg.segment_files
    :members:
    :undoc-members:
    :show-inheritance:
 
-usseg.Single\_image\_processing module
+usseg.single\_image\_processing module
 --------------------------------------
 
-.. automodule:: usseg.Single_image_processing
+.. automodule:: usseg.single_image_processing
    :members:
    :undoc-members:
    :show-inheritance:
 
-usseg.example module
---------------------
+usseg.setup\_environment module
+--------------------------------------
 
-.. automodule:: usseg.example
+.. automodule:: usseg.setup_environment
    :members:
    :undoc-members:
    :show-inheritance:
