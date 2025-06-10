@@ -25,6 +25,8 @@ import logging
 # Module imports
 import matplotlib.pyplot as plt
 
+import pandas as pd
+
 # Local imports
 from usseg import general_functions
 
