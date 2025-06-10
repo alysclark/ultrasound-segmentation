@@ -49,6 +49,8 @@ def data_from_image(pil_img, cv2_img):
 
     # COL = General_functions.Colour_extract(PIL_image_RGB, [255, 255, 100], 100, 100)
     #text_extract_failed, df = general_functions.text_from_greyscale(cv2_img, COL)
+    # Initialize DataFrame
+    df = pd.DataFrame(columns=["Line", "Word", "Value", "Unit"])
     text_extract_failed = True
     # Failure not really relevant to the rest of the segmentation so just logged as
     # a warning for the end user.
