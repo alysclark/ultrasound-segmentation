@@ -55,7 +55,7 @@ def test_colour_extraction():
 
         H2 = cyl_length  # This is our Hypotenuse
         O2 = math.sin(math.radians(out2[6])) * H2  # Opposite length 2
-        A2 = math.cos(math.radians(out2[6])) * H2  # Adjecent length 2 == Hypotenuse1
+        A2 = math.cos(math.radians(out2[6])) * H2  # Adjacent length 2 == Hypotenuse1
         O1 = math.sin(math.radians(out2[5])) * A2
         A1 = math.cos(math.radians(out2[5])) * A2
 
@@ -68,7 +68,7 @@ def test_colour_extraction():
         B1 = out2[2] - O2
 
         Ctemp = np.array([out2[0], out2[1], out2[2]])
-        ## Visualise target pixel in the RGB space
+        # Visualise target pixel in the RGB space
         # fig = plt.figure(1)
         # ax = fig.add_subplot(111, projection='3d')
         # # ax.scatter(R1,G1,B1,color="black")
@@ -133,7 +133,7 @@ def test_colour_extraction():
 
         # generate coordinates for surface
         # "Tube"
-        X, Y, Z = [
+        X1, Y1, Z1 = [
             p1[i] + v[i] * t + r * np.sin(theta2) * n1[i] + r * np.cos(theta2) * n2[i]
             for i in [0, 1, 2]
         ]
@@ -151,7 +151,7 @@ def test_colour_extraction():
             for i in [0, 1, 2]
         ]
 
-        # ax.plot_surface(X, Y, Z,alpha=.2)
+        # ax.plot_surface(X1, Y1, Z1,alpha=.2)
         # ax.plot_surface(X2, Y2, Z2,alpha=.2)
         # ax.plot_surface(X3, Y3, Z3,alpha=.2)
         def points_in_cylinder(pt1, pt2, r, q):
@@ -162,7 +162,7 @@ def test_colour_extraction():
 
             if (
                     np.dot(q - pt1, vec) >= 0 >= np.dot(q - pt2, vec)
-                    and np.linalg.norm(np.cross(q - pt1, vec)) <= const
+                    and (np.linalg.norm(np.cross(q - pt1, vec)) <= const)
             ):
                 # print("is inside")
                 logi = 1
@@ -197,11 +197,7 @@ def test_colour_extraction():
 
         C = np.array(C)
 
-        logi = []
-        for i in range(len(Rmat)):
-            logi.append(
-                points_in_cylinder(start, end, r, np.array([Rmat[i], Gmat[i], Bmat[i]]))
-            )
+        logi = [points_in_cylinder(start, end, r, np.array([Rmat[i], Gmat[i], Bmat[i]])) for i in range(len(Rmat))]
 
         ids = np.where(np.array(logi) == 1)
         Rmat = np.array(Rmat)
@@ -218,8 +214,8 @@ def test_colour_extraction():
         COL = COL.convert("RGB")  # We need RGB, so convert here.
         PIX = COL.load()
 
-        for id in ids[0]:
-            PIX[Xs[id], Ys[id]] = (255, 255, 255)  # (Rmat[id],Gmat[id],Bmat[id])
+        for id_ in ids[0]:
+            PIX[Xs[id_], Ys[id_]] = (255, 255, 255)  # (Rmat[id],Gmat[id],Bmat[id])
 
         for y in range(COL.size[1]):
             for x in range(COL.size[0]):

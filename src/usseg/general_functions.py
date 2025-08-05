@@ -5,6 +5,7 @@ import math
 import re
 import logging
 
+import Levenshtein
 # Module imports
 import matplotlib.pyplot as plt
 from skimage import morphology, measure
@@ -841,23 +842,23 @@ def search_for_labels(
 
     dists = cdist(Final_CenPoints, Final_CenPoints)
 
-    def index_list(dists):
-        lst = list(dists)
+    def index_list(dists_inner):
+        lst = list(dists_inner)
         length = len(lst)
-        dist = []
+        dist_inner = []
         for i in lst:
             if lst.index(0) > lst.index(i):
                 diff = lst.index(0) - lst.index(i)
-                dist.append(diff)
+                dist_inner.append(diff)
             elif lst.index(0) < lst.index(i):
                 diff = abs(lst.index(i)) - abs(lst.index(0))
-                dist.append(diff)
+                dist_inner.append(diff)
             elif lst.index(0) == lst.index(i):
-                dist.append(0)
+                dist_inner.append(0)
 
         dist_divided = []
         for i in range(0, length):
-            dist_divided.append(lst[i] / dist[i])
+            dist_divided.append(lst[i] / dist_inner[i])
 
         return dist_divided
 
@@ -871,7 +872,7 @@ def search_for_labels(
     cv2.drawContours(ROI3, Final_TickIDS, -1, [255], 1)
 
     def correct_number_format(s):
-        # Check numbers dont end in a '-'
+        # Check numbers don't end in a '-'
         # Using regex to identify the pattern
         pattern = r'(-?\d+)-$'
         return re.sub(pattern, r'\1', s)
@@ -885,13 +886,13 @@ def search_for_labels(
 
     if Side == "Left":
         empty_to_fill[
-        int(Left_dimensions[2]): int(Left_dimensions[3]),
-        int(Left_dimensions[0]): int(Left_dimensions[1]),
+          int(Left_dimensions[2]): int(Left_dimensions[3]),
+          int(Left_dimensions[0]): int(Left_dimensions[1]),
         ] = ROI3  # Right ROI
     elif Side == "Right":
         empty_to_fill[
-        int(Right_dimensions[2]): int(Right_dimensions[3]),
-        int(Right_dimensions[0]): int(Right_dimensions[1]),
+          int(Right_dimensions[2]): int(Right_dimensions[3]),
+          int(Right_dimensions[0]): int(Right_dimensions[1]),
         ] = ROI3  # Left ROI
 
     return ROIAX, number, positions, empty_to_fill
@@ -1470,10 +1471,6 @@ def text_from_greyscale(input_image_obj, COL):
     PIX = COL.load()
     img = input_image_obj
 
-    from PIL import ImageFilter
-    import numpy as np
-    from scipy.ndimage import binary_dilation
-
     # 2. Apply slight Gaussian blur
     # smoothed_image = COL.filter(ImageFilter.GaussianBlur(radius=1)) # In some cases smoothing helps, in others it makes it worse?
 
@@ -1487,12 +1484,9 @@ def text_from_greyscale(input_image_obj, COL):
     data = pytesseract.image_to_data(
         pixels, output_type=Output.DICT, lang="eng", config="--oem 1 --psm 3 -c tessedit_char_blacklist=l,!_|=$"
     )
-    if (
-            len(data["text"]) < 30
-    ):  # This is rough, if more than 30 objects found then highly likley it is a waveform scan.
-        Fail = 1  # logical, keep scan or not
-    else:
-        Fail = 0
+
+    # This is rough, if more than 30 objects found then highly likely it is a waveform scan.
+    Fail = 1 if len(data["text"]) < 30 else 0
 
     # Loop through each word and draw a box around it
     y_center = np.zeros(len(data["text"]))  # Variable to store the y-center of each bounding box of text detected.
@@ -1563,8 +1557,11 @@ def text_from_greyscale(input_image_obj, COL):
     grouped_words, bounding_boxes = group_similar_numbers(y_center, tolerance, data)
 
     # The bounding box is expected in the form of (left, upper, right, lower)
-    left, top = bounding_boxes[1]['top_left']
-    right, bottom = bounding_boxes[1]['bottom_right']
+    bounding_box_index = 0 if len(bounding_boxes) == 1 else 1
+    assert len(bounding_boxes) > 0
+
+    left, top = bounding_boxes[bounding_box_index]['top_left']
+    right, bottom = bounding_boxes[bounding_box_index]['bottom_right']
     crop_box = (left - 1, top - 1, right + 1, bottom - 1)
     cropped_image = COL.crop(crop_box)
 
@@ -1767,8 +1764,6 @@ def text_from_greyscale(input_image_obj, COL):
                     matched_lines.add(i)
                     break  # Exit the inner loop once a match is found
 
-    import Levenshtein
-
     def find_closest_target(line, target_words):
         min_distance = float('inf')
         closest_word = None
@@ -1800,8 +1795,6 @@ def text_from_greyscale(input_image_obj, COL):
                     )
                     target_words.remove(closest_word)
                 matched_lines.add(i)
-
-    from Levenshtein import distance
 
     target_words_extended = [
         "Lt Ut-PS cm/s",
@@ -1871,7 +1864,7 @@ def text_from_greyscale(input_image_obj, COL):
                     line_no_digits = re.sub(r'\d+', '', line)
 
                     # Calculate basic Levenshtein distance
-                    basic_distance = distance(line_no_digits, word)
+                    basic_distance = Levenshtein.distance(line_no_digits, word)
 
                     # Apply bias if a specific suffix is expected in the line
                     expected_suffix = suffixes[j]  # Suffix that corresponds to the current target word
